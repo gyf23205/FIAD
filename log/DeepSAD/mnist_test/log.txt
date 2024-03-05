@@ -1,0 +1,67 @@
+2024-01-06 18:02:30,091 - root - INFO - Log file is ../log/DeepSAD/mnist_test/log.txt
+2024-01-06 18:02:30,091 - root - INFO - Data path is ../data
+2024-01-06 18:02:30,091 - root - INFO - Export path is ../log/DeepSAD/mnist_test
+2024-01-06 18:02:30,091 - root - INFO - Dataset: mnist
+2024-01-06 18:02:30,091 - root - INFO - Normal class: 0
+2024-01-06 18:02:30,091 - root - INFO - Ratio of labeled normal train samples: 0.00
+2024-01-06 18:02:30,091 - root - INFO - Ratio of labeled anomalous samples: 0.01
+2024-01-06 18:02:30,091 - root - INFO - Pollution ratio of unlabeled train data: 0.10
+2024-01-06 18:02:30,091 - root - INFO - Known anomaly class: 1
+2024-01-06 18:02:30,092 - root - INFO - Network: mnist_LeNet
+2024-01-06 18:02:30,092 - root - INFO - Eta-parameter: 1.00
+2024-01-06 18:02:30,136 - root - INFO - Computation device: cuda
+2024-01-06 18:02:30,136 - root - INFO - Number of threads: 0
+2024-01-06 18:02:30,136 - root - INFO - Number of dataloader workers: 0
+2024-01-06 18:06:56,143 - root - INFO - Log file is ../log/DeepSAD/mnist_test/log.txt
+2024-01-06 18:06:56,144 - root - INFO - Data path is ../data
+2024-01-06 18:06:56,144 - root - INFO - Export path is ../log/DeepSAD/mnist_test
+2024-01-06 18:06:56,144 - root - INFO - Dataset: mnist
+2024-01-06 18:06:56,144 - root - INFO - Normal class: 0
+2024-01-06 18:06:56,144 - root - INFO - Ratio of labeled normal train samples: 0.00
+2024-01-06 18:06:56,144 - root - INFO - Ratio of labeled anomalous samples: 0.01
+2024-01-06 18:06:56,144 - root - INFO - Pollution ratio of unlabeled train data: 0.10
+2024-01-06 18:06:56,144 - root - INFO - Known anomaly class: 1
+2024-01-06 18:06:56,145 - root - INFO - Network: mnist_LeNet
+2024-01-06 18:06:56,145 - root - INFO - Eta-parameter: 1.00
+2024-01-06 18:06:56,182 - root - INFO - Computation device: cuda
+2024-01-06 18:06:56,183 - root - INFO - Number of threads: 0
+2024-01-06 18:06:56,183 - root - INFO - Number of dataloader workers: 0
+2024-01-06 18:17:15,153 - root - INFO - Log file is ../log/DeepSAD/mnist_test/log.txt
+2024-01-06 18:17:15,153 - root - INFO - Data path is ../data
+2024-01-06 18:17:15,153 - root - INFO - Export path is ../log/DeepSAD/mnist_test
+2024-01-06 18:17:15,153 - root - INFO - Dataset: mnist
+2024-01-06 18:17:15,153 - root - INFO - Normal class: 0
+2024-01-06 18:17:15,153 - root - INFO - Ratio of labeled normal train samples: 0.00
+2024-01-06 18:17:15,153 - root - INFO - Ratio of labeled anomalous samples: 0.01
+2024-01-06 18:17:15,153 - root - INFO - Pollution ratio of unlabeled train data: 0.10
+2024-01-06 18:17:15,153 - root - INFO - Known anomaly class: 1
+2024-01-06 18:17:15,154 - root - INFO - Network: mnist_LeNet
+2024-01-06 18:17:15,154 - root - INFO - Eta-parameter: 1.00
+2024-01-06 18:17:15,173 - root - INFO - Set seed to 4.
+2024-01-06 18:17:15,203 - root - INFO - Computation device: cuda
+2024-01-06 18:17:15,203 - root - INFO - Number of threads: 0
+2024-01-06 18:17:15,203 - root - INFO - Number of dataloader workers: 0
+2024-01-06 18:17:17,798 - root - INFO - Pretraining: True
+2024-01-06 18:17:17,798 - root - INFO - Pretraining optimizer: adam
+2024-01-06 18:17:17,799 - root - INFO - Pretraining learning rate: 0.0001
+2024-01-06 18:17:17,799 - root - INFO - Pretraining epochs: 150
+2024-01-06 18:17:17,799 - root - INFO - Pretraining learning rate scheduler milestones: (0,)
+2024-01-06 18:17:17,799 - root - INFO - Pretraining batch size: 128
+2024-01-06 18:17:17,800 - root - INFO - Pretraining weight decay: 0.0005
+2024-01-06 18:17:17,949 - root - INFO - Starting pretraining...
+2024-01-06 18:17:17,960 - root - INFO -   LR scheduler: new learning rate is 1e-05
+2024-01-06 18:17:26,921 - root - INFO - | Epoch: 001/150 | Train Time: 8.960s | Train Loss: 0.291475 |
+2024-01-06 18:17:27,750 - root - INFO - | Epoch: 002/150 | Train Time: 0.829s | Train Loss: 0.277795 |
+2024-01-06 18:17:28,565 - root - INFO - | Epoch: 003/150 | Train Time: 0.814s | Train Loss: 0.265160 |
+2024-01-06 18:17:29,502 - root - INFO - | Epoch: 004/150 | Train Time: 0.937s | Train Loss: 0.252590 |
+2024-01-06 18:17:30,314 - root - INFO - | Epoch: 005/150 | Train Time: 0.810s | Train Loss: 0.240187 |
+2024-01-06 18:17:31,139 - root - INFO - | Epoch: 006/150 | Train Time: 0.825s | Train Loss: 0.228960 |
+2024-01-06 18:17:32,059 - root - INFO - | Epoch: 007/150 | Train Time: 0.920s | Train Loss: 0.219224 |
+2024-01-06 18:17:32,866 - root - INFO - | Epoch: 008/150 | Train Time: 0.807s | Train Loss: 0.210616 |
+2024-01-06 18:17:33,743 - root - INFO - | Epoch: 009/150 | Train Time: 0.877s | Train Loss: 0.202883 |
+2024-01-06 18:17:34,567 - root - INFO - | Epoch: 010/150 | Train Time: 0.823s | Train Loss: 0.195645 |
+2024-01-06 18:17:35,362 - root - INFO - | Epoch: 011/150 | Train Time: 0.795s | Train Loss: 0.188839 |
+2024-01-06 18:17:36,248 - root - INFO - | Epoch: 012/150 | Train Time: 0.885s | Train Loss: 0.182581 |
+2024-01-06 18:17:37,063 - root - INFO - | Epoch: 013/150 | Train Time: 0.815s | Train Loss: 0.176688 |
+2024-01-06 18:17:37,883 - root - INFO - | Epoch: 014/150 | Train Time: 0.820s | Train Loss: 0.171141 |
+2024-01-06 18:17:38,776 - root - INFO - | Epoch: 015/150 | Train Time: 0.893s | Train Loss: 0.165910 |
