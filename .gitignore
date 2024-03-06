@@ -1,2 +1,3 @@
 /src/datasets/read_bags*
-/data/bags
+/data/bags*
+**/playground.py
