@@ -4,6 +4,7 @@ from .cifar10_LeNet import CIFAR10_LeNet, CIFAR10_LeNet_Autoencoder
 from .mlp import MLP, MLP_Autoencoder
 from .vae import VariationalAutoencoder
 from .dgm import DeepGenerativeModel, StackedDeepGenerativeModel
+from .transformer import Transformer, Transformer_Autoencoder
 
 
 def build_network(net_name, ae_net=None):
@@ -15,7 +16,8 @@ def build_network(net_name, ae_net=None):
                             'arrhythmia_mlp', 'cardio_mlp', 'satellite_mlp', 'satimage-2_mlp', 'shuttle_mlp',
                             'thyroid_mlp',
                             'arrhythmia_DGM_M2', 'cardio_DGM_M2', 'satellite_DGM_M2', 'satimage-2_DGM_M2',
-                            'shuttle_DGM_M2', 'thyroid_DGM_M2')
+                            'shuttle_DGM_M2', 'thyroid_DGM_M2',
+                            'transformer')
     assert net_name in implemented_networks
 
     net = None
@@ -83,6 +85,9 @@ def build_network(net_name, ae_net=None):
     if net_name == 'thyroid_DGM_M2':
         net = DeepGenerativeModel([6, 2, 4, [32, 16]])
 
+    if net_name == 'transformer':
+        net = Transformer(8, 2, 64, 512, 8, 6)
+
     return net
 
 
@@ -93,7 +98,8 @@ def build_autoencoder(net_name):
                             'fmnist_LeNet', 'fmnist_DGM_M1M2',
                             'cifar10_LeNet', 'cifar10_DGM_M1M2',
                             'arrhythmia_mlp', 'cardio_mlp', 'satellite_mlp', 'satimage-2_mlp', 'shuttle_mlp',
-                            'thyroid_mlp')
+                            'thyroid_mlp',
+                            'transformer')
 
     assert net_name in implemented_networks
 
@@ -134,5 +140,8 @@ def build_autoencoder(net_name):
 
     if net_name == 'thyroid_mlp':
         ae_net = MLP_Autoencoder(x_dim=6, h_dims=[32, 16], rep_dim=4, bias=False)
+    
+    if net_name == 'transformer':
+        ae_net = 
 
     return ae_net
