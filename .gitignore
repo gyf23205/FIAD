@@ -1,3 +1,4 @@
 /src/datasets/read_bags*
 /data/bags*
 **/playground.py
+**/__pycache__/

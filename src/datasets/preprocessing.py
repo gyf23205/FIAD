@@ -1,6 +1,6 @@
-import torch
 import numpy as np
-
+import os
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 def create_semisupervised_setting(labels, normal_classes, outlier_classes, known_outlier_classes,
                                   ratio_known_normal, ratio_known_outlier, ratio_pollution):
@@ -64,3 +64,32 @@ def create_semisupervised_setting(labels, normal_classes, outlier_classes, known
                         + semi_labels_known_outlier)
 
     return list_idx, list_labels, list_semi_labels
+
+def batch_sequential(root):
+    seq_len = 100
+    signal_path = os.path.join(root,'innovations.npy')
+    flags_path = os.path.join(root,'flags.npy')
+    signals = np.load(signal_path)
+    flags = np.load(flags_path)
+    print(signals.shape)
+
+    # Standardize data (per feature Z-normalization, i.e. zero-mean and unit variance)
+    scaler = StandardScaler().fit(signals)
+    signals_standard = scaler.transform(signals)
+
+    # Scale to range [0,1]
+    minmax_scaler = MinMaxScaler().fit(signals_standard)
+    signals_scaled = minmax_scaler.transform(signals_standard)
+
+    signals_batched = np.zeros((len(signals_scaled)-seq_len+1, seq_len, 8))
+    flags_batched = np.zeros(len(signals_scaled)-seq_len+1)
+    for i in range(len(signals_scaled)-seq_len+1):
+        signals_batched[i,:,:] = signals_scaled[i:i+seq_len,:]
+        flags_batched[i] = 1 if np.sum(flags[i:i+seq_len])>0 else 0
+    np.save(os.path.join(root, 'innovations_batched.npy'), signals_batched)
+    np.save(os.path.join(root, 'flags_batched.npy'),flags_batched)
+
+
+if __name__=='__main__':
+    root = '/home/yifan/Git/FIAD/data/balanced_attack'
+    batch_sequential(root)

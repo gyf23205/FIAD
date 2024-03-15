@@ -1,22 +1,19 @@
 import torch
 import numpy as np
 from torch.utils.data import Dataset
-from pathlib import Path
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import os
 
 class MySpoofing(Dataset):
-    def __init__(self, dataset_name, train, random_state, transform, target_transform) -> None:
+    def __init__(self, root, dataset_name, train, random_state) -> None:
         super().__init__()
         self.classes = [0,1]
         self.train = train
         self.dataset_name = dataset_name
-        self.transform = transform
-        self.target_transform = target_transform
         test_ratio = 0.2
 
-        path = os.path.join(Path(__file__).resolve().parents[2],'data/balanced_attack')
+        path = os.path.join(root,'data/balanced_attack')
         signals = np.load(os.path.join(path,'innovations_batched.npy'))
         flags = np.load(os.path.join(path,'flags_batched.npy'))
         self.flags = flags
@@ -36,21 +33,21 @@ class MySpoofing(Dataset):
         y_train = np.concatenate([y_train_norm, y_train_out])
         y_test = np.concatenate((y_test_norm, y_test_out))
 
-        # Standardize data (per feature Z-normalization, i.e. zero-mean and unit variance)
-        scaler = StandardScaler().fit(X_train)
-        X_train_stand = scaler.transform(X_train)
-        X_test_stand = scaler.transform(X_test)
+        # # Standardize data (per feature Z-normalization, i.e. zero-mean and unit variance)
+        # scaler = StandardScaler().fit(X_train)
+        # X_train_stand = scaler.transform(X_train)
+        # X_test_stand = scaler.transform(X_test)
 
-        # Scale to range [0,1]
-        minmax_scaler = MinMaxScaler().fit(X_train_stand)
-        X_train_scaled = minmax_scaler.transform(X_train_stand)
-        X_test_scaled = minmax_scaler.transform(X_test_stand)
+        # # Scale to range [0,1]
+        # minmax_scaler = MinMaxScaler().fit(X_train_stand)
+        # X_train_scaled = minmax_scaler.transform(X_train_stand)
+        # X_test_scaled = minmax_scaler.transform(X_test_stand)
         
         if self.train:
-            self.data = torch.tensor(X_train_scaled, dtype=torch.float32)
+            self.data = torch.tensor(X_train, dtype=torch.float32)
             self.targets = torch.tensor(y_train, dtype=torch.int64)
         else:
-            self.data = torch.tensor(X_test_scaled, dtype=torch.float32)
+            self.data = torch.tensor(X_test, dtype=torch.float32)
             self.targets = torch.tensor(y_test, dtype=torch.int64)
 
         self.semi_targets = torch.zeros_like(self.targets)

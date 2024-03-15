@@ -38,8 +38,7 @@ class ODDSADDataset(BaseADDataset):
         # Get test set
         self.test_set = ODDSDataset(root=self.root, dataset_name=dataset_name, train=False, random_state=random_state)
 
-    def loaders(self, batch_size: int, shuffle_train=True, shuffle_test=False, num_workers: int = 0) -> (
-            DataLoader, DataLoader):
+    def loaders(self, batch_size: int, shuffle_train=True, shuffle_test=False, num_workers: int = 0) -> tuple[DataLoader, DataLoader]:
         train_loader = DataLoader(dataset=self.train_set, batch_size=batch_size, shuffle=shuffle_train,
                                   num_workers=num_workers, drop_last=True)
         test_loader = DataLoader(dataset=self.test_set, batch_size=batch_size, shuffle=shuffle_test,
