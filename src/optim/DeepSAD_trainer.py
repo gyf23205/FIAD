@@ -89,6 +89,9 @@ class DeepSADTrainer(BaseTrainer):
             logger.info(f'| Epoch: {epoch + 1:03}/{self.n_epochs:03} | Train Time: {epoch_train_time:.3f}s '
                         f'| Train Loss: {epoch_loss / n_batches:.6f} |')
 
+            # Validation
+            if epoch%50==0 and epoch>0:
+                
         self.train_time = time.time() - start_time
         logger.info('Training Time: {:.3f}s'.format(self.train_time))
         logger.info('Finished training.')
@@ -152,7 +155,7 @@ class DeepSADTrainer(BaseTrainer):
     def init_center_c(self, train_loader: DataLoader, net: BaseNet, eps=0.1):
         """Initialize hypersphere center c as the mean from an initial forward pass on the data."""
         n_samples = 0
-        c = torch.zeros(net.rep_dim, device=self.device)
+        c = torch.zeros(net.rep_dim*net.num_layers, device=self.device)
 
         net.eval()
         with torch.no_grad():
@@ -161,6 +164,10 @@ class DeepSADTrainer(BaseTrainer):
                 inputs, _, _, _ = data
                 inputs = inputs.to(self.device)
                 outputs = net(inputs)
+                # print('in shape:', inputs.shape)
+                # print(type(net))
+                # print('output shape:', torch.sum(outputs, dim=0).shape)
+                # print('center shape', c.shape)
                 n_samples += outputs.shape[0]
                 c += torch.sum(outputs, dim=0)
 

@@ -28,6 +28,7 @@ def create_semisupervised_setting(labels, normal_classes, outlier_classes, known
                   [0, -ratio_pollution, (1-ratio_pollution), 0]])
     b = np.array([n_normal, 0, 0, 0])
     x = np.linalg.solve(a, b)
+    print('number of samples:',x)
 
     # Get number of samples
     n_known_normal = int(x[0])

@@ -2,7 +2,7 @@ import math
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.nn import funcational as F
+import torch.nn.functional as F
 
 
 class Transformer(nn.modules):
@@ -59,4 +59,4 @@ class Transformer(nn.modules):
 
 
 class Trasnformer_Decoder(nn.modules):
-        
+        pass

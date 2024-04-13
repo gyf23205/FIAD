@@ -2,3 +2,8 @@
 /data/bags*
 **/playground.py
 **/__pycache__/
+*.txt
+*.log
+*.json
+*.tar
+/src/wandb/*

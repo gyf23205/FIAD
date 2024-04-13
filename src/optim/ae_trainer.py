@@ -64,6 +64,9 @@ class AETrainer(BaseTrainer):
 
                 # Update network parameters via backpropagation: forward + backward + optimize
                 rec = ae_net(inputs)
+                # print("###############################################################")
+                # print(type(rec))
+                # print("###############################################################")
                 rec_loss = criterion(rec, inputs)
                 loss = torch.mean(rec_loss)
                 loss.backward()

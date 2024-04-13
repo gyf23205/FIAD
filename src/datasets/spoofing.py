@@ -3,6 +3,9 @@ from base.base_dataset import BaseADDataset
 from base.spoofing_dataset import MySpoofing
 from .preprocessing import create_semisupervised_setting
 import torch
+import os
+import numpy as np
+from sklearn.model_selection import train_test_split
 
 from pathlib import Path
 
@@ -22,9 +25,38 @@ class SpoofingDataset(BaseADDataset):
             self.known_outlier_classes = ()
         else:
             self.known_outlier_classes = (1,)
+
+        # Load data
+        test_ratio = 0.2
+        path = os.path.join(root,'balanced_attack')
+        signals = np.load(os.path.join(path,'innovations_batched.npy'))
+        flags = np.load(os.path.join(path,'flags_batched.npy'))
+        idx_norm = flags==0
+        idx_out = flags==1
+
+        X_train_norm, X_test_norm, y_train_norm, y_test_norm = train_test_split(signals[idx_norm], flags[idx_norm],
+                                                                        test_size=test_ratio, random_state=random_state)
+                                                                                
+        X_train_out, X_test_out, y_train_out, y_test_out = train_test_split(signals[idx_out], flags[idx_out],
+                                                                            test_size=0.4, random_state=random_state)
+
+        X_train = np.concatenate([X_train_norm, X_train_out])
+        X_test = np.concatenate([X_test_norm, X_test_out])
+        y_train = np.concatenate([y_train_norm, y_train_out])
+        y_test = np.concatenate((y_test_norm, y_test_out))
+        # Construct validation set
+        val_ratio = 0.5
+        idx_val = np.random.choice(len(y_test), size=int(val_ratio*len(y_test)), replace=False)
+        mask = np.ones(len(y_test),dtype=bool)
+        mask[[idx_val]] = False
+        X_val = X_test[~mask]
+        y_val = y_test[~mask]
+
+        X_test = X_test[mask]
+        y_test = y_test[mask]
         
         # Get training set
-        train_set = MySpoofing(root, dataset_name, True, random_state)
+        train_set = MySpoofing(X_train, y_train)
 
         # Creat semi-supervised setting
         idx, _, semi_targets = create_semisupervised_setting(train_set.targets.cpu().data.numpy(), self.normal_classes,
@@ -34,9 +66,10 @@ class SpoofingDataset(BaseADDataset):
 
         # Subset train_+set to semi_supervised setup
         self.train_set = Subset(train_set, idx)
+        self.val_set = MySpoofing(X_val, y_val)
         
         #Get test set
-        self.test_set = MySpoofing(root, dataset_name, False, random_state)
+        self.test_set = MySpoofing(X_test, y_test)
         
 
 
