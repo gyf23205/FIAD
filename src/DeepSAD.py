@@ -32,11 +32,13 @@ class DeepSAD(object):
 
         self.net_name = None
         self.net = None  # neural network phi
+        # self.net_store = None
 
         self.trainer = None
         self.optimizer_name = None
 
         self.ae_net = None  # autoencoder network for pretraining
+        # self.ae_net_store = None
         self.ae_trainer = None
         self.ae_optimizer_name = None
 
@@ -107,7 +109,7 @@ class DeepSAD(object):
         self.ae_trainer.test(dataset, self.ae_net)
 
         # Get test results
-        self.ae_results['test_auc'] = self.ae_trainer.test_auc
+        # self.ae_results['test_auc'] = self.ae_trainer.test_auc
         self.ae_results['test_time'] = self.ae_trainer.test_time
 
         # Initialize Deep SAD network weights from pre-trained encoder

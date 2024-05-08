@@ -9,6 +9,7 @@ import time
 import torch
 import torch.optim as optim
 import numpy as np
+import copy
 
 
 class DeepSADTrainer(BaseTrainer):
@@ -36,7 +37,7 @@ class DeepSADTrainer(BaseTrainer):
         logger = logging.getLogger()
 
         # Get train data loader
-        train_loader, _ = dataset.loaders(batch_size=self.batch_size, num_workers=self.n_jobs_dataloader)
+        train_loader, val_loader, _ = dataset.loaders(batch_size=self.batch_size, num_workers=self.n_jobs_dataloader)
 
         # Set device for network
         net = net.to(self.device)
@@ -52,13 +53,13 @@ class DeepSADTrainer(BaseTrainer):
             logger.info('Initializing center c...')
             self.c = self.init_center_c(train_loader, net)
             logger.info('Center c initialized.')
-
         # Training
         logger.info('Starting training...')
         start_time = time.time()
-        net.train()
+        best_auc = -np.inf
+        net_store = None
         for epoch in range(self.n_epochs):
-
+            net.train()
             scheduler.step()
             if epoch in self.lr_milestones:
                 logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
@@ -91,18 +92,24 @@ class DeepSADTrainer(BaseTrainer):
 
             # Validation
             if epoch%50==0 and epoch>0:
-                
+                val_auc = self.val(val_loader, net)
+                if val_auc>best_auc:
+                    # """Save Deep SAD model to export_model."""
+                    # net_dict = net.state_dict()
+                    # torch.save({'c': self.c,
+                    #             'net_dict': net_dict}, self.export_model)
+                    net_store = copy.deepcopy(net)
         self.train_time = time.time() - start_time
         logger.info('Training Time: {:.3f}s'.format(self.train_time))
         logger.info('Finished training.')
 
-        return net
+        return net_store
 
     def test(self, dataset: BaseADDataset, net: BaseNet):
         logger = logging.getLogger()
 
         # Get test data loader
-        _, test_loader = dataset.loaders(batch_size=self.batch_size, num_workers=self.n_jobs_dataloader)
+        _, _, test_loader = dataset.loaders(batch_size=self.batch_size, num_workers=self.n_jobs_dataloader)
 
         # Set device for network
         net = net.to(self.device)
@@ -152,10 +159,55 @@ class DeepSADTrainer(BaseTrainer):
         logger.info('Test Time: {:.3f}s'.format(self.test_time))
         logger.info('Finished testing.')
 
+    def val(self, val_loader, net: BaseNet):
+        logger = logging.getLogger()
+
+        # Validation
+        logger.info('Starting validation...')
+        epoch_loss = 0.0
+        n_batches = 0
+        idx_label_score = []
+        net.eval()
+        with torch.no_grad():
+            for data in val_loader:
+                inputs, labels, semi_targets, idx = data
+
+                inputs = inputs.to(self.device)
+                labels = labels.to(self.device)
+                semi_targets = semi_targets.to(self.device)
+                idx = idx.to(self.device)
+
+                outputs = net(inputs)
+                dist = torch.sum((outputs - self.c) ** 2, dim=1)
+                losses = torch.where(semi_targets == 0, dist, self.eta * ((dist + self.eps) ** semi_targets.float()))
+                loss = torch.mean(losses)
+                scores = dist
+
+                # Save triples of (idx, label, score) in a list
+                idx_label_score += list(zip(idx.cpu().data.numpy().tolist(),
+                                            labels.cpu().data.numpy().tolist(),
+                                            scores.cpu().data.numpy().tolist()))
+
+                epoch_loss += loss.item()
+                n_batches += 1
+
+        # Compute AUC
+        _, labels, scores = zip(*idx_label_score)
+        labels = np.array(labels)
+        scores = np.array(scores)
+        val_auc = roc_auc_score(labels, scores)
+
+        # Log results
+        logger.info('Val Loss: {:.6f}'.format(epoch_loss / n_batches))
+        logger.info('Val AUC: {:.2f}%'.format(100. * val_auc))
+        logger.info('Finished validation.')
+        return val_auc
+
     def init_center_c(self, train_loader: DataLoader, net: BaseNet, eps=0.1):
         """Initialize hypersphere center c as the mean from an initial forward pass on the data."""
         n_samples = 0
-        c = torch.zeros(net.rep_dim*net.num_layers, device=self.device)
+        # c = torch.zeros(net.rep_dim*net.num_layers, device=self.device)
+        c = torch.zeros(net.rep_dim, device=self.device)
 
         net.eval()
         with torch.no_grad():

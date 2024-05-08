@@ -18,7 +18,7 @@ def build_network(net_name, ae_net=None):
                             'thyroid_mlp',
                             'arrhythmia_DGM_M2', 'cardio_DGM_M2', 'satellite_DGM_M2', 'satimage-2_DGM_M2',
                             'shuttle_DGM_M2', 'thyroid_DGM_M2',
-                            'transformer','lstm')
+                            'transformer','lstm','spoof_mlp')
     assert net_name in implemented_networks
 
     net = None
@@ -91,6 +91,9 @@ def build_network(net_name, ae_net=None):
     
     if net_name == 'lstm':
         net = LSTM_Net(input_size=8, rep_dim=64, num_layers=2)
+    
+    if net_name == 'spoof_mlp':
+        net = MLP(x_dim=800, h_dims=[512, 256], rep_dim=128, bias=False)
 
     return net
 
@@ -103,7 +106,7 @@ def build_autoencoder(net_name):
                             'cifar10_LeNet', 'cifar10_DGM_M1M2',
                             'arrhythmia_mlp', 'cardio_mlp', 'satellite_mlp', 'satimage-2_mlp', 'shuttle_mlp',
                             'thyroid_mlp',
-                            'transformer', 'lstm')
+                            'transformer', 'lstm', 'spoof_mlp')
 
     assert net_name in implemented_networks
 
@@ -150,5 +153,8 @@ def build_autoencoder(net_name):
     
     if net_name == 'lstm':
         ae_net = LSTM_Autoencoder(input_size=8, rep_dim=64, num_layers=2, seq_len=100)
+
+    if net_name == 'spoof_mlp':
+        ae_net = MLP_Autoencoder(x_dim=800, h_dims=[512, 256], rep_dim=128, bias=False)
 
     return ae_net

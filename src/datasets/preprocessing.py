@@ -90,7 +90,36 @@ def batch_sequential(root):
     np.save(os.path.join(root, 'innovations_batched.npy'), signals_batched)
     np.save(os.path.join(root, 'flags_batched.npy'),flags_batched)
 
+def batch_sequential_flat(root):
+    seq_len = 100
+    num_channels = 8
+    signal_path = os.path.join(root,'innovations.npy')
+    flags_path = os.path.join(root,'flags.npy')
+    signals = np.load(signal_path)
+    flags = np.load(flags_path)
+    print(signals.shape)
+
+    # Standardize data (per feature Z-normalization, i.e. zero-mean and unit variance)
+    scaler = StandardScaler().fit(signals)
+    signals_standard = scaler.transform(signals)
+
+    # Scale to range [0,1]
+    minmax_scaler = MinMaxScaler().fit(signals_standard)
+    signals_scaled = minmax_scaler.transform(signals_standard)
+
+    # Each sample move forward one time step
+    num_samples = len(signals_scaled)-seq_len+1
+    signals_batched = np.zeros((num_samples, seq_len*num_channels))
+    flags_batched = np.zeros(num_samples)
+    for i in range(num_samples):
+        for j in range(num_channels):
+            signals_batched[i,j*seq_len:(j+1)*seq_len] = signals_scaled[i:i+seq_len,j]
+        flags_batched[i] = 1 if np.sum(flags[i:i+seq_len])>0 else 0
+    np.save(os.path.join(root, 'innovations_batched_flat.npy'), signals_batched)
+    np.save(os.path.join(root, 'flags_batched_flat.npy'),flags_batched)
 
 if __name__=='__main__':
     root = '/home/yifan/Git/FIAD/data/balanced_attack'
-    batch_sequential(root)
+    batch_sequential_flat(root)
+    x = np.load(os.path.join(root, 'innovations_batched_flat.npy'))
+    print(x.shape)

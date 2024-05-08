@@ -3,6 +3,7 @@ from .fmnist import FashionMNIST_Dataset
 from .cifar10 import CIFAR10_Dataset
 from .odds import ODDSADDataset
 from .spoofing import SpoofingDataset
+from .spoofing_flat import SpoofingDatasetFlat
 
 
 def load_dataset(dataset_name, data_path, normal_class, known_outlier_class, n_known_outlier_classes: int = 0,
@@ -11,7 +12,7 @@ def load_dataset(dataset_name, data_path, normal_class, known_outlier_class, n_k
     """Loads the dataset."""
 
     implemented_datasets = ('mnist', 'fmnist', 'cifar10',
-                            'arrhythmia', 'cardio', 'satellite', 'satimage-2', 'shuttle', 'thyroid', 'spoofing')
+                            'arrhythmia', 'cardio', 'satellite', 'satimage-2', 'shuttle', 'thyroid', 'spoofing', 'spoofing_flat')
     assert dataset_name in implemented_datasets
 
     dataset = None
@@ -54,6 +55,15 @@ def load_dataset(dataset_name, data_path, normal_class, known_outlier_class, n_k
     
     if dataset_name == 'spoofing':
         dataset = SpoofingDataset(root=data_path,
+                                dataset_name=dataset_name,
+                                n_known_outlier_classes=n_known_outlier_classes,
+                                ratio_known_normal=ratio_known_normal,
+                                ratio_known_outlier=ratio_known_outlier,
+                                ratio_pollution=ratio_pollution,
+                                random_state=random_state)
+    
+    if dataset_name == 'spoofing_flat':
+        dataset = SpoofingDatasetFlat(root=data_path,
                                 dataset_name=dataset_name,
                                 n_known_outlier_classes=n_known_outlier_classes,
                                 ratio_known_normal=ratio_known_normal,

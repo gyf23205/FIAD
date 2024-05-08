@@ -83,7 +83,7 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
     logger.info('Number of dataloader workers: %d' % n_jobs_dataloader)
 
     # Load data
-    print(seed)
+    # print(seed)
     dataset = load_dataset(dataset_name, data_path, normal_class, known_outlier_class, n_known_outlier_classes,
                            ratio_known_normal, ratio_known_outlier, ratio_pollution,
                            random_state=np.random.RandomState(seed))
@@ -153,10 +153,10 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
 
 
 if __name__ == '__main__':
-    dataset_name = 'spoofing'
-    net_name = 'lstm'
-    xp_path = '../log/DeepSAD/spoofing_test' # Log path
-    data_path = '../data'
+    dataset_name = 'spoofing_flat'
+    net_name = 'spoof_mlp'
+    xp_path = './log/DeepSAD/spoofing_flat' # Log path
+    data_path = './data'
     ratio_known_outlier = 0.01
     ratio_pollution = 0.1
     lr = 0.0001
