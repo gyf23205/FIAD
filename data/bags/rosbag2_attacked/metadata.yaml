@@ -1,0 +1,32 @@
+rosbag2_bagfile_information:
+  version: 5
+  storage_identifier: sqlite3
+  duration:
+    nanoseconds: 18584688287
+  starting_time:
+    nanoseconds_since_epoch: 1709751462111474939
+  message_count: 2417
+  topics_with_message_count:
+    - topic_metadata:
+        name: /spoofing_flag
+        type: std_msgs/msg/Bool
+        serialization_format: cdr
+        offered_qos_profiles: "- history: 1\n  depth: 10\n  reliability: 1\n  durability: 2\n  deadline:\n    sec: 9223372036\n    nsec: 854775807\n  lifespan:\n    sec: 9223372036\n    nsec: 854775807\n  liveliness: 1\n  liveliness_lease_duration:\n    sec: 9223372036\n    nsec: 854775807\n  avoid_ros_namespace_conventions: false"
+      message_count: 828
+    - topic_metadata:
+        name: /px4_1/fmu/out/estimator_innovations
+        type: px4_msgs/msg/EstimatorInnovations
+        serialization_format: cdr
+        offered_qos_profiles: "- history: 1\n  depth: 1\n  reliability: 2\n  durability: 1\n  deadline:\n    sec: 9223372036\n    nsec: 854775807\n  lifespan:\n    sec: 9223372036\n    nsec: 854775807\n  liveliness: 1\n  liveliness_lease_duration:\n    sec: 9223372036\n    nsec: 854775807\n  avoid_ros_namespace_conventions: false"
+      message_count: 1589
+  compression_format: ""
+  compression_mode: ""
+  relative_file_paths:
+    - rosbag2_2024_03_06-18_57_42_0.db3
+  files:
+    - path: rosbag2_2024_03_06-18_57_42_0.db3
+      starting_time:
+        nanoseconds_since_epoch: 1709751462111474939
+      duration:
+        nanoseconds: 18584688287
+      message_count: 2417
