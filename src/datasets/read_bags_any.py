@@ -4,7 +4,8 @@ from rosbags.typesys import Stores, get_types_from_msg, get_typestore
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
-from rosbags.typesys.stores.ros2_humble import std_msgs__msg__Bool as Bool
+import os
+# from rosbags.typesys.stores.ros2_humble import std_msgs__msg__Bool as Bool
 
 def bag2np(path):
     # create reader instance and open for reading
@@ -61,8 +62,17 @@ def bag2np(path):
             data_exp[:, n_recorded:n_recorded+n_channels[i]] = expand(data[i], idx[i], n_sample)
             n_recorded += n_channels[i]
                 
+    signals = data_exp[:, :-1]
+    labels = data_exp[:, -1]
+    scaler = StandardScaler().fit(signals)
+    signals_standard = scaler.transform(signals)
+    # Scale to range [0,1]
+    minmax_scaler = MinMaxScaler().fit(signals_standard)
+    signals_scaled = minmax_scaler.transform(signals_standard)
+
     # Return data and lable seperately
-    return data_exp[:, :-1], data_exp[:, -1]
+    return signals_scaled, labels
+    
 
 def find_index(x, y):
     '''
@@ -98,22 +108,20 @@ if __name__ == '__main__':
         # print(topic)
         msg_def  = Path('/home/yifan/Git/mixed_sense/work/ros2_ws/px4/msg/{}.msg'.format(topic)).read_text(encoding='utf-8')
         # register_types()
-        print('px4_msgs/msg/{}'.format(topic))
+        # print('px4_msgs/msg/{}'.format(topic))
         add_types.update(get_types_from_msg(msg_def, 'px4_msgs/msg/{}'.format(topic)))
         # exec(f'from rosbags.typesys.types import px4_msgs__msg__{topic} as {topic}')
     typestore.register(add_types)
 
-    path = '/home/yifan/Git/PIAD/data/bags/rosbag2_moving1'
-    data, label = bag2np(path)
-    scaler = StandardScaler().fit(data)
-    signals_standard = scaler.transform(data)
+    path = '/home/yifan/Git/PIAD/data/bags/rosbag2_2024_07_05-10_44_57'
+    path_save = '/home/yifan/Git/PIAD/data/spoofing'
+    data, labels = bag2np(path)
+    np.save(os.path.join(path_save, 'data.npy'), data)
+    np.save(os.path.join(path_save, 'labels.npy'),labels)
 
-    # Scale to range [0,1]
-    minmax_scaler = MinMaxScaler().fit(signals_standard)
-    signals_scaled = minmax_scaler.transform(signals_standard)
-    plt.plot(signals_scaled[:, 9:12])
-    # plt.plot(label)
+    plt.plot(data)
+    plt.plot(labels)
     # plt.legend(['traj1', 'flag'])
-    plt.legend(['traj1','traj2','traj3','innoX','innoY', 'innovZ', 'posX', 'posY', 'posZ', 'gps1','gps2','gps3', 'flag'])
+    # plt.legend(['traj1','traj2','traj3','innoX','innoY', 'innovZ', 'posX', 'posY', 'posZ', 'gps1','gps2','gps3', 'flag'])
     plt.show()
      

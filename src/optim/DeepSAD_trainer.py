@@ -104,6 +104,7 @@ class DeepSADTrainer(BaseTrainer):
         logger.info('Finished training.')
 
         return net_store
+    
 
     def test(self, dataset: BaseADDataset, net: BaseNet):
         logger = logging.getLogger()

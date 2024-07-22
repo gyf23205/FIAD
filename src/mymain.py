@@ -13,7 +13,7 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
          ratio_known_normal=0.0, ratio_known_outlier=0.0, ratio_pollution=0.0, device='cuda', seed=-1,
          optimizer_name='adam', lr=0.001, n_epochs=50, lr_milestone=50, batch_size=128, weight_decay=1e-6,
          pretrain=True, ae_optimizer_name='adam', ae_lr=0.001, ae_n_epochs=100, ae_lr_milestone=[0], ae_batch_size=128, ae_weight_decay=1e-6,
-         num_threads=0, n_jobs_dataloader=0, normal_class=0, known_outlier_class=1, n_known_outlier_classes=0):
+         num_threads=0, n_jobs_dataloader=0, normal_class=0, known_outlier_class=1, n_known_outlier_classes=0, with_next=False):
     """
     Deep SAD, a method for deep semi-supervised anomaly detection.
 
@@ -132,16 +132,27 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
     logger.info('Training batch size: %d' % batch_size)
     logger.info('Training weight decay: %g' % weight_decay)
 
-    # Train model on dataset
-    deepSAD.train(dataset,
-                  optimizer_name=optimizer_name,
-                  lr=lr,
-                  n_epochs=n_epochs,
-                  lr_milestones=lr_milestone,
-                  batch_size=batch_size,
-                  weight_decay=weight_decay,
-                  device=device,
-                  n_jobs_dataloader=n_jobs_dataloader)
+    if with_next:
+        deepSAD.train_next(dataset,
+                    optimizer_name=optimizer_name,
+                    lr=lr,
+                    n_epochs=n_epochs,
+                    lr_milestones=lr_milestone,
+                    batch_size=batch_size,
+                    weight_decay=weight_decay,
+                    device=device,
+                    n_jobs_dataloader=n_jobs_dataloader)
+    else:
+        # Train model on dataset
+        deepSAD.train(dataset,
+                    optimizer_name=optimizer_name,
+                    lr=lr,
+                    n_epochs=n_epochs,
+                    lr_milestones=lr_milestone,
+                    batch_size=batch_size,
+                    weight_decay=weight_decay,
+                    device=device,
+                    n_jobs_dataloader=n_jobs_dataloader)
 
     # Test model
     deepSAD.test(dataset, device=device, n_jobs_dataloader=n_jobs_dataloader)

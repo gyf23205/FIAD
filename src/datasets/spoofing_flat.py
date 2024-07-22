@@ -28,9 +28,9 @@ class SpoofingDatasetFlat(BaseADDataset):
 
         # Load data
         test_ratio = 0.2
-        path = os.path.join(root,'balanced_attack')
-        signals = np.load(os.path.join(path,'innovations_batched_flat.npy'))
-        flags = np.load(os.path.join(path,'flags_batched_flat.npy'))
+        path = os.path.join(root,'spoofing')
+        signals = np.load(os.path.join(path,'data_batched.npy'))
+        flags = np.load(os.path.join(path,'labels_flat.npy'))
         idx_norm = flags==0
         idx_out = flags==1
 

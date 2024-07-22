@@ -66,6 +66,7 @@ def create_semisupervised_setting(labels, normal_classes, outlier_classes, known
 
     return list_idx, list_labels, list_semi_labels
 
+
 def batch_sequential(root):
     seq_len = 100
     signal_path = os.path.join(root,'innovations.npy')
@@ -92,34 +93,37 @@ def batch_sequential(root):
 
 def batch_sequential_flat(root):
     seq_len = 100
-    num_channels = 8
-    signal_path = os.path.join(root,'innovations.npy')
-    flags_path = os.path.join(root,'flags.npy')
-    signals = np.load(signal_path)
+    signal_path = os.path.join(root,'data.npy')
+    flags_path = os.path.join(root,'labels.npy')
+    signals_scaled = np.load(signal_path)
     flags = np.load(flags_path)
-    print(signals.shape)
+    num_channels = signals_scaled.shape[-1]
+    print(signals_scaled.shape)
 
     # Standardize data (per feature Z-normalization, i.e. zero-mean and unit variance)
-    scaler = StandardScaler().fit(signals)
-    signals_standard = scaler.transform(signals)
+    # scaler = StandardScaler().fit(signals)
+    # signals_standard = scaler.transform(signals)
 
-    # Scale to range [0,1]
-    minmax_scaler = MinMaxScaler().fit(signals_standard)
-    signals_scaled = minmax_scaler.transform(signals_standard)
+    # # Scale to range [0,1]
+    # minmax_scaler = MinMaxScaler().fit(signals_standard)
+    # signals_scaled = minmax_scaler.transform(signals_standard)
 
     # Each sample move forward one time step
-    num_samples = len(signals_scaled)-seq_len+1
+    num_samples = len(signals_scaled)-seq_len
     signals_batched = np.zeros((num_samples, seq_len*num_channels))
-    flags_batched = np.zeros(num_samples)
+    signals_next_batched = np.zeros((num_samples, num_channels))
+    labels_batched = np.zeros(num_samples)
     for i in range(num_samples):
         for j in range(num_channels):
             signals_batched[i,j*seq_len:(j+1)*seq_len] = signals_scaled[i:i+seq_len,j]
-        flags_batched[i] = 1 if np.sum(flags[i:i+seq_len])>0 else 0
-    np.save(os.path.join(root, 'innovations_batched_flat.npy'), signals_batched)
-    np.save(os.path.join(root, 'flags_batched_flat.npy'),flags_batched)
+        signals_next_batched[i, :] = signals_scaled[i+seq_len,:]
+        labels_batched[i] = 1 if np.sum(flags[i:i+seq_len])>0 else 0
+    np.save(os.path.join(root, 'data_batched.npy'), signals_batched)
+    np.save(os.path.join(root, 'next_batched.npy'), signals_next_batched)
+    np.save(os.path.join(root, 'labels_batched.npy'),labels_batched)
 
 if __name__=='__main__':
-    root = '/home/yifan/Git/FIAD/data/balanced_attack'
+    root = '/home/yifan/Git/PIAD/data/spoofing'
     batch_sequential_flat(root)
-    x = np.load(os.path.join(root, 'innovations_batched_flat.npy'))
-    print(x.shape)
+    # x = np.load(os.path.join(root, 'innovations_batched_flat.npy'))
+    # print(x.shape)

@@ -1,7 +1,7 @@
 from .mnist_LeNet import MNIST_LeNet, MNIST_LeNet_Autoencoder
 from .fmnist_LeNet import FashionMNIST_LeNet, FashionMNIST_LeNet_Autoencoder
 from .cifar10_LeNet import CIFAR10_LeNet, CIFAR10_LeNet_Autoencoder
-from .mlp import MLP, MLP_Autoencoder
+from .mlp import MLP, MLP_Autoencoder, MLP_Next
 from .vae import VariationalAutoencoder
 from .dgm import DeepGenerativeModel, StackedDeepGenerativeModel
 # from .transformer import Transformer, Transformer_Autoencoder
@@ -93,7 +93,7 @@ def build_network(net_name, ae_net=None):
         net = LSTM_Net(input_size=8, rep_dim=64, num_layers=2)
     
     if net_name == 'spoof_mlp':
-        net = MLP(x_dim=800, h_dims=[512, 256], rep_dim=128, bias=False)
+        net = MLP(x_dim=1200, h_dims=[512, 256], rep_dim=128, bias=False)
 
     return net
 
@@ -155,6 +155,17 @@ def build_autoencoder(net_name):
         ae_net = LSTM_Autoencoder(input_size=8, rep_dim=64, num_layers=2, seq_len=100)
 
     if net_name == 'spoof_mlp':
-        ae_net = MLP_Autoencoder(x_dim=800, h_dims=[512, 256], rep_dim=128, bias=False)
+        ae_net = MLP_Autoencoder(x_dim=1200, h_dims=[512, 256], rep_dim=128, bias=False)
 
     return ae_net
+
+def build_network_physical(net_name):
+    implemented_networks = ('spoof_mlp')
+    assert net_name in implemented_networks
+
+    net_physical = None
+
+    if net_name == 'spoof_mlp':
+        net_physical = MLP_Next(x_dim=1200, h_dims=[512, 256], rep_dim=128, bias=False)
+    
+    return net_physical

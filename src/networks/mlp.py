@@ -45,6 +45,22 @@ class MLP_Decoder(BaseNet):
         x = self.reconstruction(x)
         return self.output_activation(x)
 
+class MLP_Physical(BaseNet):
+
+    def __init__(self, x_dim, seq_len, h_dims=[128, 64], rep_dim=32, bias=False):
+        super().__init__()
+
+        self.rep_dim = rep_dim
+        self.encoder = MLP(x_dim, h_dims, rep_dim, bias)
+        self.predictor = MLP_Decoder(int(x_dim//seq_len), list(reversed(h_dims)), rep_dim, bias)
+
+    def forward(self, x):
+        x = self.encoder(x)
+        if self.training:
+            x_next = self.predictor(x)
+            return x, x_next
+        else:
+            return x
 
 class MLP_Autoencoder(BaseNet):
 

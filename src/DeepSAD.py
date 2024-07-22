@@ -2,9 +2,10 @@ import json
 import torch
 
 from base.base_dataset import BaseADDataset
-from networks.main import build_network, build_autoencoder
+from networks.main import build_network, build_autoencoder, build_network_physical
 from optim.DeepSAD_trainer import DeepSADTrainer
 from optim.ae_trainer import AETrainer
+from optim.DeepSAD_trainer_physical import DeepSADTrainerPhysical
 
 
 class DeepSAD(object):
@@ -62,7 +63,7 @@ class DeepSAD(object):
 
     def train(self, dataset: BaseADDataset, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 50,
               lr_milestones: tuple = (), batch_size: int = 128, weight_decay: float = 1e-6, device: str = 'cuda',
-              n_jobs_dataloader: int = 0):
+              n_jobs_dataloader: int = 0, with_physical=False):
         """Trains the Deep SAD model on the training data."""
 
         self.optimizer_name = optimizer_name
@@ -115,6 +116,35 @@ class DeepSAD(object):
         # Initialize Deep SAD network weights from pre-trained encoder
         self.init_network_weights_from_pretraining()
 
+    def train_physical(self, dataset: BaseADDataset, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 100,
+                lr_milestones: tuple = (), batch_size: int = 128, weight_decay: float = 1e-6, device: str = 'cuda',
+                n_jobs_dataloader: int = 0):
+        """Train with system dynamics"""
+
+        # Set autoencoder network
+        self.net = build_network_physical(self.net_name)
+
+
+        # Train
+        self.optimizer_name = optimizer_name
+        self.trainer = DeepSADTrainerPhysical(optimizer_name, lr=lr, n_epochs=n_epochs, lr_milestones=lr_milestones,
+                                    batch_size=batch_size, weight_decay=weight_decay, device=device,
+                                    n_jobs_dataloader=n_jobs_dataloader)
+        self.net = self.trainer.train(dataset, self.net)
+
+        # Get train results
+        self.results['train_time'] = self.trainer.train_time
+
+        # Test
+        self.trainer.test(dataset, self.net)
+
+        # Get test results
+        # self.ae_results['test_auc'] = self.ae_trainer.test_auc
+        self.results['test_time'] = self.trainer.test_time
+
+        # Initialize Deep SAD network weights from pre-trained encoder
+        self.init_network_weights_from_pretraining()
+
     def init_network_weights_from_pretraining(self):
         """Initialize the Deep SAD network weights from the encoder weights of the pretraining autoencoder."""
 
@@ -127,6 +157,21 @@ class DeepSAD(object):
         net_dict.update(ae_net_dict)
         # Load the new state_dict
         self.net.load_state_dict(net_dict)
+
+    def create_from_physically_informed(self):
+        """Create a network without a state estimator from one trained with estimator"""
+
+        net_temp = build_network(self.net_name)
+        net_dict = net_temp.state_dict()
+        net_physical_dict = self.net.state_dict()
+
+        # Filter out decoder network keys
+        net_physical_dict = {k: v for k, v in net_physical_dict.items() if k in net_dict}
+        # Overwrite values in the existing state_dict
+        net_dict.update(net_physical_dict)
+        # Load the new state_dict
+        net_temp.load_state_dict(net_dict)
+        self.net = net_temp
 
     def save_model(self, export_model, save_ae=True):
         """Save Deep SAD model to export_model."""
