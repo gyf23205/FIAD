@@ -1,7 +1,7 @@
 from .mnist_LeNet import MNIST_LeNet, MNIST_LeNet_Autoencoder
 from .fmnist_LeNet import FashionMNIST_LeNet, FashionMNIST_LeNet_Autoencoder
 from .cifar10_LeNet import CIFAR10_LeNet, CIFAR10_LeNet_Autoencoder
-from .mlp import MLP, MLP_Autoencoder, MLP_Next
+from .mlp import MLP, MLP_Autoencoder, MLP_Physical
 from .vae import VariationalAutoencoder
 from .dgm import DeepGenerativeModel, StackedDeepGenerativeModel
 # from .transformer import Transformer, Transformer_Autoencoder
@@ -166,6 +166,6 @@ def build_network_physical(net_name):
     net_physical = None
 
     if net_name == 'spoof_mlp':
-        net_physical = MLP_Next(x_dim=1200, h_dims=[512, 256], rep_dim=128, bias=False)
+        net_physical = MLP_Physical(x_dim=1200, seq_len=100, h_dims=[512, 256], rep_dim=128, bias=False)
     
     return net_physical

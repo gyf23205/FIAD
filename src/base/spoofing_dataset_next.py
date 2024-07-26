@@ -3,7 +3,7 @@ import numpy as np
 from torch.utils.data import Dataset
 import os
 
-class MySpoofingNext(Dataset):
+class MySpoofingPhysical(Dataset):
     def __init__(self, data, targets, data_next) -> None:
         super().__init__()
         self.classes = [0,1]

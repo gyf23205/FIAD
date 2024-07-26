@@ -61,6 +61,11 @@ class DeepSAD(object):
         self.net_name = net_name
         self.net = build_network(net_name)
 
+    # def set_network_physical(self, net_name):
+    #     '''Build network with the state predication part'''
+    #     self.net_name = net_name
+    #     self.net = build_network_physical(net_name)
+
     def train(self, dataset: BaseADDataset, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 50,
               lr_milestones: tuple = (), batch_size: int = 128, weight_decay: float = 1e-6, device: str = 'cuda',
               n_jobs_dataloader: int = 0, with_physical=False):
@@ -118,7 +123,7 @@ class DeepSAD(object):
 
     def train_physical(self, dataset: BaseADDataset, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 100,
                 lr_milestones: tuple = (), batch_size: int = 128, weight_decay: float = 1e-6, device: str = 'cuda',
-                n_jobs_dataloader: int = 0):
+                n_jobs_dataloader: int = 0, weight_pred=5):
         """Train with system dynamics"""
 
         # Set autoencoder network
@@ -127,10 +132,10 @@ class DeepSAD(object):
 
         # Train
         self.optimizer_name = optimizer_name
-        self.trainer = DeepSADTrainerPhysical(optimizer_name, lr=lr, n_epochs=n_epochs, lr_milestones=lr_milestones,
+        self.trainer = DeepSADTrainerPhysical(self.c, self.eta, optimizer_name, lr=lr, n_epochs=n_epochs, lr_milestones=lr_milestones,
                                     batch_size=batch_size, weight_decay=weight_decay, device=device,
                                     n_jobs_dataloader=n_jobs_dataloader)
-        self.net = self.trainer.train(dataset, self.net)
+        self.net = self.trainer.train(dataset, self.net, weight_pred)
 
         # Get train results
         self.results['train_time'] = self.trainer.train_time
@@ -143,7 +148,7 @@ class DeepSAD(object):
         self.results['test_time'] = self.trainer.test_time
 
         # Initialize Deep SAD network weights from pre-trained encoder
-        self.init_network_weights_from_pretraining()
+        self.create_from_physically_informed()
 
     def init_network_weights_from_pretraining(self):
         """Initialize the Deep SAD network weights from the encoder weights of the pretraining autoencoder."""

@@ -2,7 +2,9 @@ from base.base_trainer import BaseTrainer
 from base.base_dataset import BaseADDataset
 from base.base_net import BaseNet
 from torch.utils.data.dataloader import DataLoader
+from torch.nn import MSELoss
 from sklearn.metrics import roc_auc_score
+import wandb
 
 import logging
 import time
@@ -33,7 +35,7 @@ class DeepSADTrainerPhysical(BaseTrainer):
         self.test_time = None
         self.test_scores = None
 
-    def train(self, dataset: BaseADDataset, net: BaseNet):
+    def train(self, dataset: BaseADDataset, net: BaseNet, weight_pred):
         logger = logging.getLogger()
 
         # Get train data loader
@@ -68,17 +70,20 @@ class DeepSADTrainerPhysical(BaseTrainer):
             n_batches = 0
             epoch_start_time = time.time()
             for data in train_loader:
-                inputs, _, semi_targets, _ = data
-                inputs, semi_targets = inputs.to(self.device), semi_targets.to(self.device)
+                inputs, _, semi_targets, _, signal_next = data
+                inputs, semi_targets, signal_next = inputs.to(self.device), semi_targets.to(self.device), signal_next.to(self.device)
 
                 # Zero the network parameter gradients
                 optimizer.zero_grad()
 
                 # Update network parameters via backpropagation: forward + backward + optimize
-                outputs = net(inputs)
+                outputs, signal_pred = net(inputs)
                 dist = torch.sum((outputs - self.c) ** 2, dim=1)
                 losses = torch.where(semi_targets == 0, dist, self.eta * ((dist + self.eps) ** semi_targets.float()))
                 loss = torch.mean(losses)
+                MSE_loss = MSELoss()
+                pred_loss = MSE_loss(signal_pred, signal_next)
+                loss += weight_pred * pred_loss
                 loss.backward()
                 optimizer.step()
 
@@ -89,10 +94,12 @@ class DeepSADTrainerPhysical(BaseTrainer):
             epoch_train_time = time.time() - epoch_start_time
             logger.info(f'| Epoch: {epoch + 1:03}/{self.n_epochs:03} | Train Time: {epoch_train_time:.3f}s '
                         f'| Train Loss: {epoch_loss / n_batches:.6f} |')
+            wandb.log({'Train loss': epoch_loss / n_batches, 'Train time': epoch_train_time})
 
             # Validation
             if epoch%50==0 and epoch>0:
                 val_auc = self.val(val_loader, net)
+                wandb.log({'Validation AUC': val_auc})
                 if val_auc>best_auc:
                     # """Save Deep SAD model to export_model."""
                     # net_dict = net.state_dict()
@@ -214,7 +221,7 @@ class DeepSADTrainerPhysical(BaseTrainer):
         with torch.no_grad():
             for data in train_loader:
                 # get the inputs of the batch
-                inputs, _, _, _ = data
+                inputs, _, _, _, _ = data
                 inputs = inputs.to(self.device)
                 outputs = net(inputs)
                 # print('in shape:', inputs.shape)

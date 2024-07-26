@@ -56,7 +56,7 @@ class AETrainer(BaseTrainer):
             n_batches = 0
             epoch_start_time = time.time()
             for data in train_loader:
-                inputs, _, _, _ = data
+                inputs, _, _, _, _ = data
                 inputs = inputs.to(self.device)
 
                 # Zero the network parameter gradients

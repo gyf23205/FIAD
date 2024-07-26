@@ -1,0 +1,53 @@
+wandb_version: 1
+
+ratio_known_outlier:
+  desc: null
+  value: 0.01
+ratio_pollution:
+  desc: null
+  value: 0.1
+lr:
+  desc: null
+  value: 0.0001
+batch size:
+  desc: null
+  value: 128
+weight decay:
+  desc: null
+  value: 5.0e-07
+weight pred:
+  desc: null
+  value: 5
+_wandb:
+  desc: null
+  value:
+    python_version: 3.9.18
+    cli_version: 0.17.5
+    framework: torch
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    start_time: 1721836928
+    t:
+      1:
+      - 1
+      - 5
+      - 41
+      - 51
+      - 53
+      - 55
+      2:
+      - 1
+      - 5
+      - 41
+      - 51
+      - 53
+      - 55
+      3:
+      - 2
+      - 16
+      - 23
+      4: 3.9.18
+      5: 0.17.5
+      8:
+      - 5
+      13: linux-x86_64

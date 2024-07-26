@@ -1,10 +1,11 @@
 from torch.utils.data import DataLoader, Subset
 from base.base_dataset import BaseADDataset
-from base.spoofing_dataset_next import MySpoofingNext
+from base.spoofing_dataset_next import MySpoofingPhysical
 from base.spoofing_dataset import MySpoofing
 from .preprocessing import create_semisupervised_setting
 import torch
 import os
+import logging
 import numpy as np
 from sklearn.model_selection import train_test_split
 
@@ -12,7 +13,7 @@ from pathlib import Path
 
 
 
-class SpoofingDatasetFlat(BaseADDataset):
+class SpoofingDatasetPhysical(BaseADDataset):
     def __init__(self, root: str, dataset_name: str, n_known_outlier_classes: int = 0, ratio_known_normal: float = 0.0,
                  ratio_known_outlier: float = 0.0, ratio_pollution: float = 0.0, random_state=None):
         super().__init__(root)
@@ -31,7 +32,7 @@ class SpoofingDatasetFlat(BaseADDataset):
         test_ratio = 0.2
         path = os.path.join(root,'spoofing')
         signals = np.load(os.path.join(path,'data_batched.npy'))
-        signals_next = np.load(os.path.joint(path, 'next_batched.npy'))
+        signals_next = np.load(os.path.join(path, 'next_batched.npy'))
         flags = np.load(os.path.join(path,'labels_batched.npy'))
         idx_norm = flags==0
         idx_out = flags==1
@@ -40,7 +41,7 @@ class SpoofingDatasetFlat(BaseADDataset):
         X_train_norm, X_test_norm, y_train_norm, y_test_norm, next_train_norm, _ = train_test_split(signals[idx_norm], flags[idx_norm], signals_next[idx_norm],
                                                                         test_size=test_ratio, random_state=random_state)
                                                                                 
-        X_train_out, X_test_out, y_train_out, y_test_out, next_train_out, _ = train_test_split(signals[idx_out], flags[idx_out],
+        X_train_out, X_test_out, y_train_out, y_test_out, next_train_out, _ = train_test_split(signals[idx_out], flags[idx_out], signals_next[idx_out],
                                                                             test_size=0.4, random_state=random_state)
 
         X_train = np.concatenate([X_train_norm, X_train_out])
@@ -61,7 +62,7 @@ class SpoofingDatasetFlat(BaseADDataset):
         y_test = y_test[mask]
         
         # Get training set
-        train_set = MySpoofingNext(X_train, y_train, next_train)
+        train_set = MySpoofingPhysical(X_train, y_train, next_train)
 
         # Creat semi-supervised setting
         idx, _, semi_targets = create_semisupervised_setting(train_set.targets.cpu().data.numpy(), self.normal_classes,

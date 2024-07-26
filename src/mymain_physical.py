@@ -3,6 +3,7 @@ import logging
 import random
 import numpy as np
 from datetime import datetime
+import wandb
 
 from utils.config import Config
 from utils.visualization.plot_images_grid import plot_images_grid
@@ -13,7 +14,7 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
          ratio_known_normal=0.0, ratio_known_outlier=0.0, ratio_pollution=0.0, device='cuda', seed=-1,
          optimizer_name='adam', lr=0.001, n_epochs=50, lr_milestone=50, batch_size=128, weight_decay=1e-6,
          pretrain=True, ae_optimizer_name='adam', ae_lr=0.001, ae_n_epochs=100, ae_lr_milestone=[0], ae_batch_size=128, ae_weight_decay=1e-6,
-         num_threads=0, n_jobs_dataloader=0, normal_class=0, known_outlier_class=1, n_known_outlier_classes=0):
+         num_threads=0, n_jobs_dataloader=0, normal_class=0, known_outlier_class=1, n_known_outlier_classes=0, weight_pred=5):
     """
     Deep SAD, a method for deep semi-supervised anomaly detection.
 
@@ -133,7 +134,7 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
     logger.info('Training weight decay: %g' % weight_decay)
 
     # Train model on dataset
-    deepSAD.train(dataset,
+    deepSAD.train_physical(dataset,
                   optimizer_name=optimizer_name,
                   lr=lr,
                   n_epochs=n_epochs,
@@ -141,7 +142,8 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
                   batch_size=batch_size,
                   weight_decay=weight_decay,
                   device=device,
-                  n_jobs_dataloader=n_jobs_dataloader)
+                  n_jobs_dataloader=n_jobs_dataloader,
+                  weight_pred=weight_pred)
 
     # Test model
     deepSAD.test(dataset, device=device, n_jobs_dataloader=n_jobs_dataloader)
@@ -153,9 +155,12 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
 
 
 if __name__ == '__main__':
-    dataset_name = 'spoofing_flat'
+    # Log in wandb and setup hyperparameters
+    wandb.login(key='1888b9830153065d084181ffc29812cd1011b84b')
+
+    dataset_name = 'spoofing_physical'
     net_name = 'spoof_mlp'
-    xp_path = './log/DeepSAD/spoofing_flat' # Log path
+    xp_path = './log/DeepSAD/spoofing' # Log path
     data_path = './data'
     ratio_known_outlier = 0.01
     ratio_pollution = 0.1
@@ -171,11 +176,22 @@ if __name__ == '__main__':
     ae_weight_decay = 0.5e-3
     normal_class = 0
     known_outlier_class = 1
+    weight_pred = 5
     n_known_outlier_classes = 1 # Number of known outlier classes. If 0, no anomalies are known. 
                                 # If 1, outlier class as specified in --known_outlier_class option.
                                 # If > 1, the specified number of outlier classes will be sampled at random.
     
-
+    wandb.init(
+        project='PIAD',
+        config={
+           'ratio_known_outlier': ratio_known_outlier,
+           'ratio_pollution': ratio_pollution,
+           'lr': lr,
+           'batch size': batch_size,
+           'weight decay': weight_decay,
+           'weight pred': weight_pred, 
+        }
+    )
     # Make the code deterministic
     seed = 4
 
@@ -183,5 +199,5 @@ if __name__ == '__main__':
           ratio_pollution=ratio_pollution, lr=lr, n_epochs=n_epochs, lr_milestone=lr_milestone,
           weight_decay=weight_decay, pretrain=pretrain, ae_lr=ae_lr, ae_n_epochs=ae_n_epochs,
           batch_size=batch_size, ae_batch_size=ae_batch_size, ae_weight_decay=ae_weight_decay, normal_class=normal_class,
-          known_outlier_class=known_outlier_class, n_known_outlier_classes=n_known_outlier_classes,seed=seed
-         )
+          known_outlier_class=known_outlier_class, n_known_outlier_classes=n_known_outlier_classes,seed=seed, weight_pred=weight_pred)
+wandb.finish()
