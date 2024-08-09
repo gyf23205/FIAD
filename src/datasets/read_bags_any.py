@@ -64,14 +64,14 @@ def bag2np(path):
                 
     signals = data_exp[:, :-1]
     labels = data_exp[:, -1]
-    # scaler = StandardScaler().fit(signals)
-    # signals_standard = scaler.transform(signals)
-    # # Scale to range [0,1]
-    # minmax_scaler = MinMaxScaler().fit(signals_standard)
-    # signals_scaled = minmax_scaler.transform(signals_standard)
+    scaler = StandardScaler().fit(signals)
+    signals_standard = scaler.transform(signals)
+    # Scale to range [0,1]
+    minmax_scaler = MinMaxScaler().fit(signals_standard)
+    signals_scaled = minmax_scaler.transform(signals_standard)
 
     # Return data and lable seperately
-    return signals, labels
+    return signals_scaled, labels
     
 
 def find_index(x, y):
