@@ -41,6 +41,8 @@ class DeepSADTrainerPhysical(BaseTrainer):
         # Get train data loader
         train_loader, val_loader, _ = dataset.loaders(batch_size=self.batch_size, num_workers=self.n_jobs_dataloader)
 
+        logger.info(f'Training set size: {len(train_loader)}')
+        logger.info(f'Validation set size: {len(val_loader)}')
         # Set device for network
         net = net.to(self.device)
 
@@ -56,17 +58,18 @@ class DeepSADTrainerPhysical(BaseTrainer):
             self.c = self.init_center_c(train_loader, net)
             logger.info('Center c initialized.')
         # Training
-        logger.info('Starting training...')
+        logger.info('Starting training physically...')
         start_time = time.time()
         best_auc = -np.inf
         net_store = None
         for epoch in range(self.n_epochs):
             net.train()
-            scheduler.step()
-            if epoch in self.lr_milestones:
-                logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
+            # scheduler.step()
+            # if epoch in self.lr_milestones:
+            #     logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
 
             epoch_loss = 0.0
+            epoch_loss_pred = 0.0
             n_batches = 0
             epoch_start_time = time.time()
             for data in train_loader:
@@ -82,35 +85,39 @@ class DeepSADTrainerPhysical(BaseTrainer):
                 losses = torch.where(semi_targets == 0, dist, self.eta * ((dist + self.eps) ** semi_targets.float()))
                 loss = torch.mean(losses)
                 MSE_loss = MSELoss()
-                pred_loss = MSE_loss(signal_pred, signal_next)
-                loss += weight_pred * pred_loss
+                loss_pred = MSE_loss(signal_pred, signal_next)
+                loss += weight_pred * loss_pred
                 loss.backward()
                 optimizer.step()
 
                 epoch_loss += loss.item()
+                epoch_loss_pred += loss_pred.item()
                 n_batches += 1
 
+            scheduler.step()
+            if epoch in self.lr_milestones:
+                logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
+                
             # log epoch statistics
             epoch_train_time = time.time() - epoch_start_time
             logger.info(f'| Epoch: {epoch + 1:03}/{self.n_epochs:03} | Train Time: {epoch_train_time:.3f}s '
                         f'| Train Loss: {epoch_loss / n_batches:.6f} |')
-            wandb.log({'Train loss': epoch_loss / n_batches, 'Train time': epoch_train_time})
+            wandb.log({'Train loss': epoch_loss / n_batches, 'Train time': epoch_train_time, 
+                       'loss_pred':epoch_loss_pred/n_batches, 'loss_dist':(epoch_loss-epoch_loss_pred)/n_batches})
 
             # Validation
-            if epoch%50==0 and epoch>0:
+            if epoch%20==0 and epoch>0:
                 val_auc = self.val(val_loader, net)
                 wandb.log({'Validation AUC': val_auc})
                 if val_auc>best_auc:
-                    # """Save Deep SAD model to export_model."""
-                    # net_dict = net.state_dict()
-                    # torch.save({'c': self.c,
-                    #             'net_dict': net_dict}, self.export_model)
+                    logger.info("Find better model.")
+                    best_auc = val_auc
                     net_store = copy.deepcopy(net)
         self.train_time = time.time() - start_time
         logger.info('Training Time: {:.3f}s'.format(self.train_time))
         logger.info('Finished training.')
 
-        return net_store
+        return net_store, best_auc
     
 
     def test(self, dataset: BaseADDataset, net: BaseNet):
@@ -118,7 +125,7 @@ class DeepSADTrainerPhysical(BaseTrainer):
 
         # Get test data loader
         _, _, test_loader = dataset.loaders(batch_size=self.batch_size, num_workers=self.n_jobs_dataloader)
-
+        logger.info(f'Test set size: {len(test_loader)}')
         # Set device for network
         net = net.to(self.device)
 

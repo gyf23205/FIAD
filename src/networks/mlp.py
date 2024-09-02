@@ -57,7 +57,7 @@ class MLP_Physical(BaseNet):
     def forward(self, x):
         x = self.encoder(x)
         x_next = self.predictor(x)
-        if self.training:           
+        if self.training: # Is this ok?     
             return x, x_next
         else:
             return x

@@ -150,9 +150,9 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
     deepSAD.test_physical(dataset, device=device, n_jobs_dataloader=n_jobs_dataloader)
 
     # Save results, model, and configuration
-    deepSAD.save_results(export_json=xp_path + '/results_physical.json')
-    deepSAD.save_model(export_model=xp_path + '/model_physical.tar', save_ae=pretrain)
-    cfg.save_config(export_json=xp_path + '/config_physical.json')
+    deepSAD.save_results(export_json=xp_path + '/results.json')
+    deepSAD.save_model(export_model=xp_path + '/model.tar', save_ae=pretrain)
+    cfg.save_config(export_json=xp_path + '/config.json')
 
 
 if __name__ == '__main__':
@@ -163,8 +163,6 @@ if __name__ == '__main__':
     net_name = 'spoof_mlp'
     xp_path = './log/DeepSAD/spoofing_physical' # Log path
     data_path = './data'
-    ratio_known_outlier = 0.005
-    ratio_pollution = 0.2
     lr = 0.0001
     n_epochs = 300
     lr_milestone = [50]
@@ -172,33 +170,33 @@ if __name__ == '__main__':
     weight_decay = 0.5e-6
     pretrain = False
     ae_lr = 0.0001
+    weight_pred = 9.111514123138956
     ae_n_epochs = 150
     ae_batch_size = 128
     ae_weight_decay = 0.5e-3
     normal_class = 0
     known_outlier_class = 1
-    weight_pred = 9.111514123138956
+    # weight_pred = 5
     n_known_outlier_classes = 1 # Number of known outlier classes. If 0, no anomalies are known. 
                                 # If 1, outlier class as specified in --known_outlier_class option.
                                 # If > 1, the specified number of outlier classes will be sampled at random.
     
     wandb.init(
-        project='PIAD_clear',
-        name='Physical_hard',
+        project='PIAD',
+        name='Physical_hard_weight_pred',
         config={
             'dataset':'unscaled',
-           'ratio_known_outlier': ratio_known_outlier,
-           'ratio_pollution': ratio_pollution,
            'lr': lr,
            'batch size': batch_size,
            'weight decay': weight_decay,
-           'weight pred': weight_pred, 
            'physical': True,
            'pretrain': pretrain
         }
     )
 
-    # hypers = wandb.config
+    ratio_known_outlier = wandb.config.ratio_known_outlier
+    ratio_pollution = wandb.config.ratio_pollution
+
     setting.init([])
     # Make the code deterministic
     seed = 6

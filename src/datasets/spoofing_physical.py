@@ -28,12 +28,17 @@ class SpoofingDatasetPhysical(BaseADDataset):
         else:
             self.known_outlier_classes = (1,)
 
+        # Get logger
+        logger = logging.getLogger()
+
         # Load data
         test_ratio = 0.2
         path = os.path.join(root,'spoofing')
-        signals = np.load(os.path.join(path,'data_batched.npy'))
-        signals_next = np.load(os.path.join(path, 'next_batched.npy'))
-        flags = np.load(os.path.join(path,'labels_batched.npy'))
+        # signals = np.load(os.path.join(path,'data_batched.npy'))
+        # signals_next = np.load(os.path.join(path, 'next_batched.npy'))
+        signals = np.load(os.path.join(path,'data_unscaled_multi_noise_batched.npy'))
+        signals_next = np.load(os.path.join(path, 'next_unscaled_multi_noise_batched.npy'))
+        flags = np.load(os.path.join(path,'labels_unscaled_multi_noise_batched.npy'))
         idx_norm = flags==0
         idx_out = flags==1
 
@@ -49,6 +54,8 @@ class SpoofingDatasetPhysical(BaseADDataset):
         y_train = np.concatenate([y_train_norm, y_train_out])
         y_test = np.concatenate((y_test_norm, y_test_out))
         next_train = np.concatenate([next_train_norm, next_train_out])
+        logger.info(f'n sample in train: Normal: {len(y_train_norm)}, out: {len(y_train_out)}')
+        logger.info(f'n sample in test: Normal: {len(y_test_norm)}, out: {len(y_test_out)}')
         # Construct validation set
         val_ratio = 0.5
         idx_val = np.random.choice(len(y_test), size=int(val_ratio*len(y_test)), replace=False)
@@ -60,6 +67,9 @@ class SpoofingDatasetPhysical(BaseADDataset):
 
         X_test = X_test[mask]
         y_test = y_test[mask]
+        # X_val = X_test # !
+        # y_val = y_test # !
+
         
         # Get training set
         train_set = MySpoofingPhysical(X_train, y_train, next_train)

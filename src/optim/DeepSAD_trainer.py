@@ -4,6 +4,7 @@ from base.base_net import BaseNet
 from torch.utils.data.dataloader import DataLoader
 from sklearn.metrics import roc_auc_score
 
+import wandb
 import logging
 import time
 import torch
@@ -60,15 +61,15 @@ class DeepSADTrainer(BaseTrainer):
         net_store = None
         for epoch in range(self.n_epochs):
             net.train()
-            scheduler.step()
-            if epoch in self.lr_milestones:
-                logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
+            # scheduler.step()
+            # if epoch in self.lr_milestones:
+            #     logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
 
             epoch_loss = 0.0
             n_batches = 0
             epoch_start_time = time.time()
             for data in train_loader:
-                inputs, _, semi_targets, _ = data
+                inputs, _, semi_targets, _, _ = data
                 inputs, semi_targets = inputs.to(self.device), semi_targets.to(self.device)
 
                 # Zero the network parameter gradients
@@ -85,25 +86,29 @@ class DeepSADTrainer(BaseTrainer):
                 epoch_loss += loss.item()
                 n_batches += 1
 
+            scheduler.step()
+            if epoch in self.lr_milestones:
+                logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
+
             # log epoch statistics
             epoch_train_time = time.time() - epoch_start_time
             logger.info(f'| Epoch: {epoch + 1:03}/{self.n_epochs:03} | Train Time: {epoch_train_time:.3f}s '
                         f'| Train Loss: {epoch_loss / n_batches:.6f} |')
+            wandb.log({'Train loss': epoch_loss / n_batches, 'Train time': epoch_train_time})
+
 
             # Validation
-            if epoch%50==0 and epoch>0:
+            if epoch%20==0 and epoch>0:
                 val_auc = self.val(val_loader, net)
+                wandb.log({'Validation AUC': val_auc})
                 if val_auc>best_auc:
-                    # """Save Deep SAD model to export_model."""
-                    # net_dict = net.state_dict()
-                    # torch.save({'c': self.c,
-                    #             'net_dict': net_dict}, self.export_model)
+                    best_auc = val_auc
                     net_store = copy.deepcopy(net)
         self.train_time = time.time() - start_time
         logger.info('Training Time: {:.3f}s'.format(self.train_time))
         logger.info('Finished training.')
 
-        return net_store
+        return net_store, best_auc
     
 
     def test(self, dataset: BaseADDataset, net: BaseNet):
@@ -214,7 +219,7 @@ class DeepSADTrainer(BaseTrainer):
         with torch.no_grad():
             for data in train_loader:
                 # get the inputs of the batch
-                inputs, _, _, _ = data
+                inputs, _, _, _, _ = data
                 inputs = inputs.to(self.device)
                 outputs = net(inputs)
                 # print('in shape:', inputs.shape)

@@ -2,14 +2,16 @@ import torch
 import logging
 import random
 import numpy as np
+import wandb
 from datetime import datetime
+import setting
 
 from utils.config import Config
 from utils.visualization.plot_images_grid import plot_images_grid
 from DeepSAD import DeepSAD
 from datasets.main import load_dataset
 
-def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_model=None, eta=1.0,
+def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_model=None, load_path=None, eta=1.0,
          ratio_known_normal=0.0, ratio_known_outlier=0.0, ratio_pollution=0.0, device='cuda', seed=-1,
          optimizer_name='adam', lr=0.001, n_epochs=50, lr_milestone=50, batch_size=128, weight_decay=1e-6,
          pretrain=True, ae_optimizer_name='adam', ae_lr=0.001, ae_n_epochs=100, ae_lr_milestone=[0], ae_batch_size=128, ae_weight_decay=1e-6,
@@ -97,8 +99,8 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
 
     # If specified, load Deep SAD model (center c, network weights, and possibly autoencoder weights)
     if load_model:
-        deepSAD.load_model(model_path=load_model, load_ae=True, map_location=device)
-        logger.info('Loading model from %s.' % load_model)
+        deepSAD.load_model(model_path=load_path, load_ae=True, map_location=device)
+        logger.info('Loading model from %s.' % load_path)
 
     logger.info('Pretraining: %s' % pretrain)
     if pretrain:
@@ -132,50 +134,41 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
     logger.info('Training batch size: %d' % batch_size)
     logger.info('Training weight decay: %g' % weight_decay)
 
-    if with_next:
-        deepSAD.train_next(dataset,
-                    optimizer_name=optimizer_name,
-                    lr=lr,
-                    n_epochs=n_epochs,
-                    lr_milestones=lr_milestone,
-                    batch_size=batch_size,
-                    weight_decay=weight_decay,
-                    device=device,
-                    n_jobs_dataloader=n_jobs_dataloader)
-    else:
         # Train model on dataset
-        deepSAD.train(dataset,
-                    optimizer_name=optimizer_name,
-                    lr=lr,
-                    n_epochs=n_epochs,
-                    lr_milestones=lr_milestone,
-                    batch_size=batch_size,
-                    weight_decay=weight_decay,
-                    device=device,
-                    n_jobs_dataloader=n_jobs_dataloader)
+    deepSAD.train(dataset,
+                optimizer_name=optimizer_name,
+                lr=lr,
+                n_epochs=n_epochs,
+                lr_milestones=lr_milestone,
+                batch_size=batch_size,
+                weight_decay=weight_decay,
+                device=device,
+                n_jobs_dataloader=n_jobs_dataloader)
 
     # Test model
     deepSAD.test(dataset, device=device, n_jobs_dataloader=n_jobs_dataloader)
 
     # Save results, model, and configuration
     deepSAD.save_results(export_json=xp_path + '/results.json')
-    deepSAD.save_model(export_model=xp_path + '/model.tar')
+    deepSAD.save_model(export_model=xp_path + '/model.tar', save_ae=pretrain)
     cfg.save_config(export_json=xp_path + '/config.json')
 
 
 if __name__ == '__main__':
-    dataset_name = 'spoofing_flat'
+    wandb.login(key='1888b9830153065d084181ffc29812cd1011b84b')
+
+    dataset_name = 'spoofing_physical'
     net_name = 'spoof_mlp'
-    xp_path = './log/DeepSAD/spoofing_flat' # Log path
+    xp_path = './log/DeepSAD/spoofing' # Log path
     data_path = './data'
-    ratio_known_outlier = 0.01
+    ratio_known_outlier = 0.001
     ratio_pollution = 0.1
     lr = 0.0001
-    n_epochs = 150
+    n_epochs = 300
     lr_milestone = [50]
     batch_size = 128
     weight_decay = 0.5e-6
-    pretrain = True
+    pretrain = False
     ae_lr = 0.0001
     ae_n_epochs = 150
     ae_batch_size = 128
@@ -186,9 +179,25 @@ if __name__ == '__main__':
                                 # If 1, outlier class as specified in --known_outlier_class option.
                                 # If > 1, the specified number of outlier classes will be sampled at random.
     
+    
+    wandb.init(
+        project='PIAD',
+        name='Vanilla hard',
+        config={
+           'ratio_known_outlier': ratio_known_outlier,
+           'ratio_pollution': ratio_pollution,
+           'lr': lr,
+           'batch size': batch_size,
+           'weight decay': weight_decay,
+           'physical': False,
+           'iter': n_epochs,
+           'pretrain': pretrain
+        }
+    )
 
+    setting.init([])
     # Make the code deterministic
-    seed = 4
+    seed = 6
 
     main(dataset_name, net_name, xp_path, data_path, ratio_known_outlier=ratio_known_outlier,
           ratio_pollution=ratio_pollution, lr=lr, n_epochs=n_epochs, lr_milestone=lr_milestone,

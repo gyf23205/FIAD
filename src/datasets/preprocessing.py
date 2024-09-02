@@ -1,6 +1,7 @@
 import numpy as np
 import os
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
+import logging
 
 def create_semisupervised_setting(labels, normal_classes, outlier_classes, known_outlier_classes,
                                   ratio_known_normal, ratio_known_outlier, ratio_pollution):
@@ -15,6 +16,8 @@ def create_semisupervised_setting(labels, normal_classes, outlier_classes, known
     :param ratio_pollution: the desired pollution ratio of the unlabeled data with unknown (unlabeled) anomalies.
     :return: tuple with list of sample indices, list of original labels, and list of semi-supervised labels
     """
+    logger = logging.getLogger()
+
     idx_normal = np.argwhere(np.isin(labels, normal_classes)).flatten()
     idx_outlier = np.argwhere(np.isin(labels, outlier_classes)).flatten()
     idx_known_outlier_candidates = np.argwhere(np.isin(labels, known_outlier_classes)).flatten()
@@ -28,13 +31,14 @@ def create_semisupervised_setting(labels, normal_classes, outlier_classes, known
                   [0, -ratio_pollution, (1-ratio_pollution), 0]])
     b = np.array([n_normal, 0, 0, 0])
     x = np.linalg.solve(a, b)
-    print('number of samples:',x)
+    
 
     # Get number of samples
     n_known_normal = int(x[0])
     n_unlabeled_normal = int(x[1])
     n_unlabeled_outlier = int(x[2])
     n_known_outlier = int(x[3])
+    logger.info(f'In semi setting: n_known_normal: {n_known_normal}, n_unlabled_normal: {n_unlabeled_normal}, n_unlabeled_outlier: {n_unlabeled_outlier}, n_known_outlier: {n_known_outlier}')
 
     # Sample indices
     perm_normal = np.random.permutation(n_normal)
@@ -93,8 +97,9 @@ def batch_sequential(root):
 
 def batch_sequential_flat(root):
     seq_len = 100
-    signal_path = os.path.join(root,'data.npy')
-    flags_path = os.path.join(root,'labels.npy')
+    # signal_path = os.path.join(root,'data.npy')
+    signal_path = os.path.join(root,'data_unscaled_multi_noise.npy')
+    flags_path = os.path.join(root,'labels_unscaled_multi_noise.npy')
     signals_scaled = np.load(signal_path)
     flags = np.load(flags_path)
     num_channels = signals_scaled.shape[-1]
@@ -118,12 +123,14 @@ def batch_sequential_flat(root):
             signals_batched[i,j*seq_len:(j+1)*seq_len] = signals_scaled[i:i+seq_len,j]
         signals_next_batched[i, :] = signals_scaled[i+seq_len,:]
         labels_batched[i] = 1 if np.sum(flags[i:i+seq_len])>0 else 0
-    np.save(os.path.join(root, 'data_batched.npy'), signals_batched)
-    np.save(os.path.join(root, 'next_batched.npy'), signals_next_batched)
-    np.save(os.path.join(root, 'labels_batched.npy'),labels_batched)
+    # np.save(os.path.join(root, 'data_batched.npy'), signals_batched)
+    # np.save(os.path.join(root, 'next_batched.npy'), signals_next_batched)
+    np.save(os.path.join(root, 'data_unscaled_multi_noise_batched.npy'), signals_batched)
+    np.save(os.path.join(root, 'next_unscaled_multi_noise_batched.npy'), signals_next_batched)
+    np.save(os.path.join(root, 'labels_unscaled_multi_noise_batched.npy'),labels_batched)
 
 if __name__=='__main__':
-    root = '/home/yifan/Git/PIAD/data/spoofing'
+    root = '/home/yifan/git/FIAD/data/spoofing'
     batch_sequential_flat(root)
     # x = np.load(os.path.join(root, 'innovations_batched_flat.npy'))
     # print(x.shape)

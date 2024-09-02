@@ -6,6 +6,7 @@ from .vae import VariationalAutoencoder
 from .dgm import DeepGenerativeModel, StackedDeepGenerativeModel
 # from .transformer import Transformer, Transformer_Autoencoder
 from .lstm import LSTM_Net, LSTM_Autoencoder
+import setting
 
 
 def build_network(net_name, ae_net=None):
@@ -93,7 +94,7 @@ def build_network(net_name, ae_net=None):
         net = LSTM_Net(input_size=8, rep_dim=64, num_layers=2)
     
     if net_name == 'spoof_mlp':
-        net = MLP(x_dim=1200, h_dims=[512, 256], rep_dim=128, bias=False)
+        net = MLP(x_dim=1200, h_dims=[setting.hd1, setting.hd2], rep_dim=setting.rep, bias=False)
 
     return net
 
@@ -155,7 +156,7 @@ def build_autoencoder(net_name):
         ae_net = LSTM_Autoencoder(input_size=8, rep_dim=64, num_layers=2, seq_len=100)
 
     if net_name == 'spoof_mlp':
-        ae_net = MLP_Autoencoder(x_dim=1200, h_dims=[512, 256], rep_dim=128, bias=False)
+        ae_net = MLP_Autoencoder(x_dim=1200, h_dims=[setting.hd1, setting.hd2], rep_dim=setting.rep, bias=False)
 
     return ae_net
 
@@ -166,6 +167,6 @@ def build_network_physical(net_name):
     net_physical = None
 
     if net_name == 'spoof_mlp':
-        net_physical = MLP_Physical(x_dim=1200, seq_len=100, h_dims=[512, 256], rep_dim=128, bias=False)
+        net_physical = MLP_Physical(x_dim=1200, seq_len=100, h_dims=[setting.hd1, setting.hd2], rep_dim=setting.rep, bias=False)
     
     return net_physical

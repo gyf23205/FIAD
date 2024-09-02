@@ -1,5 +1,7 @@
 import json
 import torch
+import wandb
+import copy
 
 from base.base_dataset import BaseADDataset
 from networks.main import build_network, build_autoencoder, build_network_physical
@@ -76,15 +78,29 @@ class DeepSAD(object):
                                       lr_milestones=lr_milestones, batch_size=batch_size, weight_decay=weight_decay,
                                       device=device, n_jobs_dataloader=n_jobs_dataloader)
         # Get the model
-        self.net = self.trainer.train(dataset, self.net)
+        self.net, best_auc = self.trainer.train(dataset, self.net)
         self.results['train_time'] = self.trainer.train_time
         self.c = self.trainer.c.cpu().data.numpy().tolist()  # get as list
+        wandb.log({'best_auc': best_auc})
 
     def test(self, dataset: BaseADDataset, device: str = 'cuda', n_jobs_dataloader: int = 0):
         """Tests the Deep SAD model on the test data."""
 
         if self.trainer is None:
             self.trainer = DeepSADTrainer(self.c, self.eta, device=device, n_jobs_dataloader=n_jobs_dataloader)
+
+        self.trainer.test(dataset, self.net)
+
+        # Get results
+        self.results['test_auc'] = self.trainer.test_auc
+        self.results['test_time'] = self.trainer.test_time
+        self.results['test_scores'] = self.trainer.test_scores
+
+    def test_physical(self, dataset: BaseADDataset, device: str = 'cuda', n_jobs_dataloader: int = 0):
+        """Tests the Deep SAD model on the test data."""
+
+        if self.trainer is None:
+            self.trainer = DeepSADTrainerPhysical(self.c, self.eta, device=device, n_jobs_dataloader=n_jobs_dataloader)
 
         self.trainer.test(dataset, self.net)
 
@@ -135,20 +151,21 @@ class DeepSAD(object):
         self.trainer = DeepSADTrainerPhysical(self.c, self.eta, optimizer_name, lr=lr, n_epochs=n_epochs, lr_milestones=lr_milestones,
                                     batch_size=batch_size, weight_decay=weight_decay, device=device,
                                     n_jobs_dataloader=n_jobs_dataloader)
-        self.net = self.trainer.train(dataset, self.net, weight_pred)
+        self.net, best_auc = self.trainer.train(dataset, self.net, weight_pred)
 
         # Get train results
         self.results['train_time'] = self.trainer.train_time
 
         # Test
-        self.trainer.test(dataset, self.net)
+        # self.trainer.test(dataset, self.net)
 
         # Get test results
         # self.ae_results['test_auc'] = self.ae_trainer.test_auc
-        self.results['test_time'] = self.trainer.test_time
+        # self.results['test_time'] = self.trainer.test_time
 
         # Initialize Deep SAD network weights from pre-trained encoder
         self.create_from_physically_informed()
+        wandb.log({'best_auc': best_auc})
 
     def init_network_weights_from_pretraining(self):
         """Initialize the Deep SAD network weights from the encoder weights of the pretraining autoencoder."""
@@ -157,9 +174,9 @@ class DeepSAD(object):
         ae_net_dict = self.ae_net.state_dict()
 
         # Filter out decoder network keys
-        ae_net_dict = {k: v for k, v in ae_net_dict.items() if k in net_dict}
+        dict_temp = {k: ae_net_dict['encoder.'+k] for k in net_dict.keys() if 'encoder.'+k in ae_net_dict}
         # Overwrite values in the existing state_dict
-        net_dict.update(ae_net_dict)
+        net_dict.update(dict_temp)
         # Load the new state_dict
         self.net.load_state_dict(net_dict)
 
@@ -171,12 +188,12 @@ class DeepSAD(object):
         net_physical_dict = self.net.state_dict()
 
         # Filter out decoder network keys
-        net_physical_dict = {k: v for k, v in net_physical_dict.items() if k in net_dict}
+        dict_temp = {k: net_physical_dict['encoder.'+k] for k in net_dict.keys() if 'encoder.'+k in net_physical_dict.keys()}
         # Overwrite values in the existing state_dict
-        net_dict.update(net_physical_dict)
+        net_dict.update(dict_temp)
         # Load the new state_dict
         net_temp.load_state_dict(net_dict)
-        self.net = net_temp
+        self.net = copy.deepcopy(net_temp)
 
     def save_model(self, export_model, save_ae=True):
         """Save Deep SAD model to export_model."""

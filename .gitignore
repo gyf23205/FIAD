@@ -4,4 +4,6 @@
 *.log
 *.json
 *.tar
-/src/wandb/*
+wandb/**
+src/wandb/**
+/data/*
