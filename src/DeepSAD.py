@@ -32,6 +32,7 @@ class DeepSAD(object):
 
         self.eta = eta
         self.c = None  # hypersphere center c
+        self.roc_curve = None  # Best decision threshold according to validtions
 
         self.net_name = None
         self.net = None  # neural network phi
@@ -81,6 +82,7 @@ class DeepSAD(object):
         self.net, best_auc = self.trainer.train(dataset, self.net)
         self.results['train_time'] = self.trainer.train_time
         self.c = self.trainer.c.cpu().data.numpy().tolist()  # get as list
+        self.roc_curve = self.trainer.roc_curve
         wandb.log({'best_auc': best_auc})
 
     def test(self, dataset: BaseADDataset, device: str = 'cuda', n_jobs_dataloader: int = 0):
@@ -136,6 +138,29 @@ class DeepSAD(object):
 
         # Initialize Deep SAD network weights from pre-trained encoder
         self.init_network_weights_from_pretraining()
+    
+    def pretrain_physical(self, dataset: BaseADDataset, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 100,
+                lr_milestones: tuple = (), batch_size: int = 128, weight_decay: float = 1e-6, device: str = 'cuda',
+                n_jobs_dataloader: int = 0, weight_pred=5):
+        """Train with system dynamics"""
+
+        # Set physics-informed network
+        self.net = build_network_physical(self.net_name)
+
+
+        # Train
+        self.optimizer_name = optimizer_name
+        self.trainer = DeepSADTrainerPhysical(self.c, self.eta, optimizer_name, lr=lr, n_epochs=n_epochs, lr_milestones=lr_milestones,
+                                    batch_size=batch_size, weight_decay=weight_decay, device=device,
+                                    n_jobs_dataloader=n_jobs_dataloader)
+        self.net = self.trainer.initilize_physical(dataset, self.net, weight_pred)
+
+        # Get train results
+        self.results['train_time'] = self.trainer.train_time
+
+        # Initialize Deep SAD network weights from pre-trained encoder
+        self.create_from_physically_informed()
+
 
     def train_physical(self, dataset: BaseADDataset, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 100,
                 lr_milestones: tuple = (), batch_size: int = 128, weight_decay: float = 1e-6, device: str = 'cuda',
@@ -155,7 +180,8 @@ class DeepSAD(object):
 
         # Get train results
         self.results['train_time'] = self.trainer.train_time
-
+        self.c = self.trainer.c.cpu().data.numpy().tolist()  # get as list
+        self.roc_curve = self.trainer.roc_curve
         # Test
         # self.trainer.test(dataset, self.net)
 
@@ -164,7 +190,7 @@ class DeepSAD(object):
         # self.results['test_time'] = self.trainer.test_time
 
         # Initialize Deep SAD network weights from pre-trained encoder
-        self.create_from_physically_informed()
+        self.create_from_physically_informed() # Comment this line if also want to save the state predictor.
         wandb.log({'best_auc': best_auc})
 
     def init_network_weights_from_pretraining(self):
@@ -194,6 +220,7 @@ class DeepSAD(object):
         # Load the new state_dict
         net_temp.load_state_dict(net_dict)
         self.net = copy.deepcopy(net_temp)
+        print('created')
 
     def save_model(self, export_model, save_ae=True):
         """Save Deep SAD model to export_model."""
@@ -202,6 +229,7 @@ class DeepSAD(object):
         ae_net_dict = self.ae_net.state_dict() if save_ae else None
 
         torch.save({'c': self.c,
+                    'roc': self.roc_curve,
                     'net_dict': net_dict,
                     'ae_net_dict': ae_net_dict}, export_model)
 
@@ -211,6 +239,7 @@ class DeepSAD(object):
         model_dict = torch.load(model_path, map_location=map_location)
 
         self.c = model_dict['c']
+        self.roc_curve = model_dict['roc']
         self.net.load_state_dict(model_dict['net_dict'])
 
         # load autoencoder parameters if specified

@@ -1,7 +1,7 @@
 from .mnist_LeNet import MNIST_LeNet, MNIST_LeNet_Autoencoder
 from .fmnist_LeNet import FashionMNIST_LeNet, FashionMNIST_LeNet_Autoencoder
 from .cifar10_LeNet import CIFAR10_LeNet, CIFAR10_LeNet_Autoencoder
-from .mlp import MLP, MLP_Autoencoder, MLP_Physical
+from .mlp import MLP, MLP_Autoencoder, MLP_Physical, MLP_Residual, MLP_State_Only
 from .vae import VariationalAutoencoder
 from .dgm import DeepGenerativeModel, StackedDeepGenerativeModel
 # from .transformer import Transformer, Transformer_Autoencoder
@@ -19,7 +19,7 @@ def build_network(net_name, ae_net=None):
                             'thyroid_mlp',
                             'arrhythmia_DGM_M2', 'cardio_DGM_M2', 'satellite_DGM_M2', 'satimage-2_DGM_M2',
                             'shuttle_DGM_M2', 'thyroid_DGM_M2',
-                            'transformer','lstm','spoof_mlp')
+                            'transformer','lstm','spoof_mlp', 'spoof_mlp_res', 'spoofing_mlp_state_only')
     assert net_name in implemented_networks
 
     net = None
@@ -89,13 +89,17 @@ def build_network(net_name, ae_net=None):
 
     # if net_name == 'transformer':
     #     net = Transformer(8, 2, 64, 512, 8, 6)
-    
     if net_name == 'lstm':
         net = LSTM_Net(input_size=8, rep_dim=64, num_layers=2)
     
     if net_name == 'spoof_mlp':
         net = MLP(x_dim=1200, h_dims=[setting.hd1, setting.hd2], rep_dim=setting.rep, bias=False)
 
+    if net_name == 'spoofing_mlp_state_only':
+        net = MLP(x_dim=1200, h_dims=[setting.hd1, setting.hd2], rep_dim=setting.rep, bias=False)
+
+    if net_name == 'spoof_mlp_res':
+        net = MLP(x_dim=1200, h_dims=[setting.hd1, setting.hd2], rep_dim=setting.rep, bias=False)
     return net
 
 
@@ -161,12 +165,20 @@ def build_autoencoder(net_name):
     return ae_net
 
 def build_network_physical(net_name):
-    implemented_networks = ('spoof_mlp')
+    implemented_networks = ('spoof_mlp', 'spoof_mlp_res', 'spoofing_mlp_state_only')
     assert net_name in implemented_networks
 
     net_physical = None
 
     if net_name == 'spoof_mlp':
-        net_physical = MLP_Physical(x_dim=1200, seq_len=100, h_dims=[setting.hd1, setting.hd2], rep_dim=setting.rep, bias=False)
+        net_physical = MLP_Physical(x_dim=1200, h_dims=[setting.hd1, setting.hd2], rep_dim=setting.rep, bias=False)
+    
+    elif net_name == 'spoof_mlp_res':
+        net_physical = MLP_Residual(x_dim=1200, h_dims=[setting.hd1, setting.hd2], rep_dim=setting.rep, bias=False)
+    
+    elif net_name == 'spoofing_mlp_state_only':
+        net_physical = MLP_State_Only(x_dim=1200, h_dims=[setting.hd1, setting.hd2], rep_dim=setting.rep, bias=False)
+    else:
+        pass
     
     return net_physical

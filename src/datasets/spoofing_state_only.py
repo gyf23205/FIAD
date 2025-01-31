@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 
-class SpoofingDatasetPhysical(BaseADDataset):
+class SpoofingDatasetStateOnly(BaseADDataset):
     def __init__(self, root: str, dataset_name: str, n_known_outlier_classes: int = 0, ratio_known_normal: float = 0.0,
                  ratio_known_outlier: float = 0.0, ratio_pollution: float = 0.0, random_state=None):
         super().__init__(root)
@@ -37,9 +37,9 @@ class SpoofingDatasetPhysical(BaseADDataset):
         path = os.path.join(root,'spoofing')
         # signals = np.load(os.path.join(path,'data_batched.npy'))
         # signals_next = np.load(os.path.join(path, 'next_batched.npy'))
-        signals = np.load(os.path.join(path,'data_multi_noise_batched_normalize_per_sample.npy'))
-        signals_next = np.load(os.path.join(path, 'next_multi_noise_batched_normalize_per_sample.npy'))
-        flags = np.load(os.path.join(path,'labels_multi_noise_batched_normalize_per_sample.npy'))
+        signals = np.load(os.path.join(path,'data_state_only.npy'))
+        signals_next = np.load(os.path.join(path, 'next_state_only.npy'))
+        flags = np.load(os.path.join(path,'labels_state_only.npy'))
         idx_norm = flags==0
         idx_out = flags==1
 

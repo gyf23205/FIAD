@@ -45,6 +45,7 @@ class SpoofingDataset(BaseADDataset):
         y_train = np.concatenate([y_train_norm, y_train_out])
         y_test = np.concatenate((y_test_norm, y_test_out))
         # Construct validation set
+
         val_ratio = 0.5
         idx_val = np.random.choice(len(y_test), size=int(val_ratio*len(y_test)), replace=False)
         mask = np.ones(len(y_test),dtype=bool)
@@ -66,10 +67,11 @@ class SpoofingDataset(BaseADDataset):
 
         # Subset train_+set to semi_supervised setup
         self.train_set = Subset(train_set, idx)
-        self.val_set = MySpoofing(X_val, y_val)
+        # self.val_set = MySpoofing(X_val, y_val)
+        self.val_set = MySpoofing(X_train, y_train)
         
         #Get test set
-        self.test_set = MySpoofing(X_test, y_test)
+        # self.test_set = MySpoofing(X_test, y_test)
         
 
 

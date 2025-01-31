@@ -2,7 +2,7 @@ from base.base_trainer import BaseTrainer
 from base.base_dataset import BaseADDataset
 from base.base_net import BaseNet
 from torch.utils.data.dataloader import DataLoader
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, roc_curve
 
 import wandb
 import logging
@@ -23,6 +23,7 @@ class DeepSADTrainer(BaseTrainer):
 
         # Deep SAD parameters
         self.c = torch.tensor(c, device=self.device) if c is not None else None
+        self.roc_curve = None
         self.eta = eta
 
         # Optimization parameters
@@ -99,9 +100,10 @@ class DeepSADTrainer(BaseTrainer):
 
             # Validation
             if epoch%20==0 and epoch>0:
-                val_auc = self.val(val_loader, net)
+                val_auc, roc_curve = self.val(val_loader, net)
                 wandb.log({'Validation AUC': val_auc})
                 if val_auc>best_auc:
+                    self.roc_curve = roc_curve
                     best_auc = val_auc
                     net_store = copy.deepcopy(net)
         self.train_time = time.time() - start_time
@@ -202,12 +204,13 @@ class DeepSADTrainer(BaseTrainer):
         labels = np.array(labels)
         scores = np.array(scores)
         val_auc = roc_auc_score(labels, scores)
+        fpr, tpr, thresholds = roc_curve(labels, scores, pos_label=1)
 
         # Log results
         logger.info('Val Loss: {:.6f}'.format(epoch_loss / n_batches))
         logger.info('Val AUC: {:.2f}%'.format(100. * val_auc))
         logger.info('Finished validation.')
-        return val_auc
+        return val_auc, (fpr, tpr, thresholds)
 
     def init_center_c(self, train_loader: DataLoader, net: BaseNet, eps=0.1):
         """Initialize hypersphere center c as the mean from an initial forward pass on the data."""

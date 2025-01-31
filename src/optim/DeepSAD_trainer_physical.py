@@ -3,7 +3,7 @@ from base.base_dataset import BaseADDataset
 from base.base_net import BaseNet
 from torch.utils.data.dataloader import DataLoader
 from torch.nn import MSELoss
-from sklearn.metrics import roc_auc_score
+from sklearn.metrics import roc_auc_score, roc_curve
 import wandb
 
 import logging
@@ -24,6 +24,7 @@ class DeepSADTrainerPhysical(BaseTrainer):
 
         # Deep SAD parameters
         self.c = torch.tensor(c, device=self.device) if c is not None else None
+        self.roc_curve = None
         self.eta = eta
 
         # Optimization parameters
@@ -107,10 +108,11 @@ class DeepSADTrainerPhysical(BaseTrainer):
 
             # Validation
             if epoch%20==0 and epoch>0:
-                val_auc = self.val(val_loader, net)
+                val_auc, roc_curve = self.val(val_loader, net)
                 wandb.log({'Validation AUC': val_auc})
                 if val_auc>best_auc:
                     logger.info("Find better model.")
+                    self.roc_curve = roc_curve
                     best_auc = val_auc
                     net_store = copy.deepcopy(net)
         self.train_time = time.time() - start_time
@@ -119,6 +121,76 @@ class DeepSADTrainerPhysical(BaseTrainer):
 
         return net_store, best_auc
     
+    def initilize_physical(self, dataset: BaseADDataset, net: BaseNet, weight_pred):
+        logger = logging.getLogger()
+
+        # Get train data loader
+        train_loader, val_loader, _ = dataset.loaders(batch_size=self.batch_size, num_workers=self.n_jobs_dataloader)
+
+        logger.info(f'Training set size: {len(train_loader)}')
+
+        # Set device for network
+        net = net.to(self.device)
+
+        # Set optimizer (Adam optimizer for now)
+        optimizer = optim.Adam(net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
+        # Set learning rate scheduler
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=self.lr_milestones, gamma=0.1)
+
+        # Initialize hypersphere center c (if c not loaded)
+        if self.c is None:
+            logger.info('Initializing center c...')
+            self.c = self.init_center_c(train_loader, net)
+            logger.info('Center c initialized.')
+        # Training
+        start_time = time.time()
+
+        for epoch in range(self.n_epochs):
+            net.train()
+            # scheduler.step()
+            # if epoch in self.lr_milestones:
+            #     logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
+
+            epoch_loss = 0.0
+            epoch_loss_pred = 0.0
+            n_batches = 0
+            epoch_start_time = time.time()
+            for data in train_loader:
+                inputs, _, semi_targets, _, signal_next = data
+                inputs, semi_targets, signal_next = inputs.to(self.device), semi_targets.to(self.device), signal_next.to(self.device)
+
+                # Zero the network parameter gradients
+                optimizer.zero_grad()
+
+                # Update network parameters via backpropagation: forward + backward + optimize
+                outputs, signal_pred = net(inputs)
+                dist = torch.sum((outputs - self.c) ** 2, dim=1)
+                losses = torch.where(semi_targets == 0, dist, self.eta * ((dist + self.eps) ** semi_targets.float()))
+                loss = torch.mean(losses)
+                MSE_loss = MSELoss()
+                loss_pred = MSE_loss(signal_pred, signal_next)
+                loss += weight_pred * loss_pred
+                loss.backward()
+                optimizer.step()
+
+                epoch_loss += loss.item()
+                epoch_loss_pred += loss_pred.item()
+                n_batches += 1
+
+            scheduler.step()
+            if epoch in self.lr_milestones:
+                logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
+                
+            # log epoch statistics
+            epoch_train_time = time.time() - epoch_start_time
+            logger.info(f'| Epoch: {epoch + 1:03}/{self.n_epochs:03} | Train Time: {epoch_train_time:.3f}s '
+                        f'| Train Loss: {epoch_loss / n_batches:.6f} |')
+
+        self.train_time = time.time() - start_time
+        logger.info('Training Time: {:.3f}s'.format(self.train_time))
+        logger.info('Finished training.')
+        return net
 
     def test(self, dataset: BaseADDataset, net: BaseNet):
         logger = logging.getLogger()
@@ -192,7 +264,7 @@ class DeepSADTrainerPhysical(BaseTrainer):
                 semi_targets = semi_targets.to(self.device)
                 idx = idx.to(self.device)
 
-                outputs = net(inputs)
+                outputs, _ = net(inputs)
                 dist = torch.sum((outputs - self.c) ** 2, dim=1)
                 losses = torch.where(semi_targets == 0, dist, self.eta * ((dist + self.eps) ** semi_targets.float()))
                 loss = torch.mean(losses)
@@ -211,12 +283,15 @@ class DeepSADTrainerPhysical(BaseTrainer):
         labels = np.array(labels)
         scores = np.array(scores)
         val_auc = roc_auc_score(labels, scores)
+        fpr, tpr, thresholds = roc_curve(labels, scores, pos_label=1)
+        # r = self.choose_best_r(fpr, tpr, thresholds)
 
         # Log results
+        # logger.info(f'fpr: {fpr[1]}, tpr: {tpr[1]}')
         logger.info('Val Loss: {:.6f}'.format(epoch_loss / n_batches))
         logger.info('Val AUC: {:.2f}%'.format(100. * val_auc))
         logger.info('Finished validation.')
-        return val_auc
+        return val_auc, (fpr, tpr, thresholds)
 
     def init_center_c(self, train_loader: DataLoader, net: BaseNet, eps=0.1):
         """Initialize hypersphere center c as the mean from an initial forward pass on the data."""
@@ -230,7 +305,7 @@ class DeepSADTrainerPhysical(BaseTrainer):
                 # get the inputs of the batch
                 inputs, _, _, _, _ = data
                 inputs = inputs.to(self.device)
-                outputs = net(inputs)
+                outputs, _ = net(inputs)
                 # print('in shape:', inputs.shape)
                 # print(type(net))
                 # print('output shape:', torch.sum(outputs, dim=0).shape)
@@ -245,3 +320,12 @@ class DeepSADTrainerPhysical(BaseTrainer):
         c[(abs(c) < eps) & (c > 0)] = eps
 
         return c
+
+    # def choose_best_r(self, fpr, tpr, thresholds):
+    #     ratio = []
+    #     eps = 1e-7  # In case divide by 0
+    #     for i in range(len(tpr)-1):
+    #         ratio.append((tpr[i+1]-tpr[i])/(fpr[i+1]-fpr[i]+eps))
+        
+    #     return thresholds[np.argmax(ratio)]
+    #     # return thresholds[-1]

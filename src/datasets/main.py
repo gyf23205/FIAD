@@ -5,6 +5,7 @@ from .odds import ODDSADDataset
 from .spoofing import SpoofingDataset
 from .spoofing_flat import SpoofingDatasetFlat
 from .spoofing_physical import SpoofingDatasetPhysical
+from .spoofing_state_only import SpoofingDatasetStateOnly
 
 
 def load_dataset(dataset_name, data_path, normal_class, known_outlier_class, n_known_outlier_classes: int = 0,
@@ -13,7 +14,7 @@ def load_dataset(dataset_name, data_path, normal_class, known_outlier_class, n_k
     """Loads the dataset."""
 
     implemented_datasets = ('mnist', 'fmnist', 'cifar10',
-                            'arrhythmia', 'cardio', 'satellite', 'satimage-2', 'shuttle', 'thyroid', 'spoofing', 'spoofing_flat', 'spoofing_physical')
+                            'arrhythmia', 'cardio', 'satellite', 'satimage-2', 'shuttle', 'thyroid', 'spoofing', 'spoofing_flat', 'spoofing_physical', 'spoofing_state_only')
     assert dataset_name in implemented_datasets
 
     dataset = None
@@ -80,5 +81,14 @@ def load_dataset(dataset_name, data_path, normal_class, known_outlier_class, n_k
                                 ratio_known_outlier=ratio_known_outlier,
                                 ratio_pollution=ratio_pollution,
                                 random_state=random_state)
+    if dataset_name == 'spoofing_state_only':
+        dataset = SpoofingDatasetStateOnly(root=data_path,
+                                dataset_name=dataset_name,
+                                n_known_outlier_classes=n_known_outlier_classes,
+                                ratio_known_normal=ratio_known_normal,
+                                ratio_known_outlier=ratio_known_outlier,
+                                ratio_pollution=ratio_pollution,
+                                random_state=random_state)
+
 
     return dataset

@@ -100,25 +100,25 @@ def expand(x, idx, n_sample):
 
 
 if __name__ == '__main__':
-    topic_list = ['TrajectorySetpoint',  'EstimatorInnovations', 'SensorGps', 'VehicleLocalPosition']
-    typestore = get_typestore(Stores.ROS2_HUMBLE)
-    # Register all topics
-    add_types = {}
-    for topic in topic_list:
-        # print(topic)
-        msg_def  = Path('/home/yifan/Git/mixed_sense/work/ros2_ws/px4/msg/{}.msg'.format(topic)).read_text(encoding='utf-8')
-        # register_types()
-        # print('px4_msgs/msg/{}'.format(topic))
-        add_types.update(get_types_from_msg(msg_def, 'px4_msgs/msg/{}'.format(topic)))
-        # exec(f'from rosbags.typesys.types import px4_msgs__msg__{topic} as {topic}')
-    typestore.register(add_types)
+    # topic_list = ['TrajectorySetpoint',  'EstimatorInnovations', 'SensorGps', 'VehicleLocalPosition']
+    # typestore = get_typestore(Stores.ROS2_HUMBLE)
+    # # Register all topics
+    # add_types = {}
+    # for topic in topic_list:
+    #     # print(topic)
+    #     msg_def  = Path('/home/yifan/Git/mixed_sense/work/ros2_ws/px4/msg/{}.msg'.format(topic)).read_text(encoding='utf-8')
+    #     # register_types()
+    #     # print('px4_msgs/msg/{}'.format(topic))
+    #     add_types.update(get_types_from_msg(msg_def, 'px4_msgs/msg/{}'.format(topic)))
+    #     # exec(f'from rosbags.typesys.types import px4_msgs__msg__{topic} as {topic}')
+    # typestore.register(add_types)
 
-    # path = '/home/yifan/Git/PIAD/data/bags/rosbag2_2024_08_09-10_25_24' # k=0.5
-    path = '/home/yifan/Git/PIAD/data/bags/rosbag2_2024_07_05-10_44_57' # k=3
-    path_save = '/home/yifan/Git/PIAD/data/spoofing'
-    data, labels = bag2np(path)
-    np.save(os.path.join(path_save, 'data.npy'), data)
-    np.save(os.path.join(path_save, 'labels.npy'),labels)
+    # # path = '/home/yifan/Git/PIAD/data/bags/rosbag2_2024_08_09-10_25_24' # k=0.5
+    # path = '/home/yifan/Git/PIAD/data/bags/rosbag2_2024_07_05-10_44_57' # k=3
+    # path_save = '/home/yifan/Git/PIAD/data/spoofing'
+    # data, labels = bag2np(path)
+    # np.save(os.path.join(path_save, 'data.npy'), data)
+    # np.save(os.path.join(path_save, 'labels.npy'),labels)
 
     # path = '/home/yifan/git/FIAD/data/bags/rosbag2_2024_08_09-10_25_24'
     # path_save = '/home/yifan/Git/PIAD/data/spoofing'
@@ -127,13 +127,13 @@ if __name__ == '__main__':
     # # np.save(os.path.join(path_save, 'labels.npy'),labels)
     data = np.load('/home/yifan/git/FIAD/data/spoofing/data_unscaled_multi_noise.npy')
     labels = np.load('/home/yifan/git/FIAD/data/spoofing/labels_unscaled_multi_noise.npy')
-    scaler = StandardScaler().fit(data)
-    signals_standard = scaler.transform(data)
+    # scaler = StandardScaler().fit(data)
+    # signals_standard = scaler.transform(data)
     # Scale to range [0,1]
-    minmax_scaler = MinMaxScaler().fit(signals_standard)
-    data = minmax_scaler.transform(signals_standard)
-    plt.plot(data)
-    plt.plot(labels)
+    # minmax_scaler = MinMaxScaler().fit(signals_standard)
+    # data = minmax_scaler.transform(signals_standard)
+    plt.plot(data[:, 6:9])
+    # plt.plot(labels)
     # plt.legend(['traj1', 'flag'])
     plt.legend(['traj1','traj2','traj3','innoX','innoY', 'innovZ', 'posX', 'posY', 'posZ', 'gps1','gps2','gps3', 'flag'])
     plt.show()

@@ -3,6 +3,7 @@ import logging
 import random
 import numpy as np
 import wandb
+import os
 from datetime import datetime
 import setting
 
@@ -149,9 +150,9 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
     deepSAD.test(dataset, device=device, n_jobs_dataloader=n_jobs_dataloader)
 
     # Save results, model, and configuration
-    deepSAD.save_results(export_json=xp_path + '/results.json')
-    deepSAD.save_model(export_model=xp_path + '/model.tar', save_ae=pretrain)
-    cfg.save_config(export_json=xp_path + '/config.json')
+    deepSAD.save_results(export_json=model_path + '/results.json')
+    deepSAD.save_model(export_model=model_path + '/model.tar', save_ae=pretrain)
+    cfg.save_config(export_json=model_path + '/config.json')
 
 
 if __name__ == '__main__':
@@ -161,9 +162,15 @@ if __name__ == '__main__':
     net_name = 'spoof_mlp'
     xp_path = './log/DeepSAD/spoofing' # Log path
     data_path = './data'
-    ratio_known_outlier = 0.001
+    ratio_known_outlier = 0.005
     ratio_pollution = 0.1
+    rko = str(ratio_known_outlier).replace('.','')
+    rp = str(ratio_pollution).replace('.','')
+    model_path = f'./model/vanilla/model_{rko}_{rp}'
+    if not os.path.exists(model_path):
+        os.makedirs(model_path)
     lr = 0.0001
+    eta = 5.0
     n_epochs = 300
     lr_milestone = [50]
     batch_size = 128
@@ -195,11 +202,11 @@ if __name__ == '__main__':
         }
     )
 
-    setting.init([])
+    setting.init([512, 512, 1024])
     # Make the code deterministic
-    seed = 6
+    seed = 4
 
-    main(dataset_name, net_name, xp_path, data_path, ratio_known_outlier=ratio_known_outlier,
+    main(dataset_name, net_name, xp_path, data_path, eta=eta, ratio_known_outlier=ratio_known_outlier,
           ratio_pollution=ratio_pollution, lr=lr, n_epochs=n_epochs, lr_milestone=lr_milestone,
           weight_decay=weight_decay, pretrain=pretrain, ae_lr=ae_lr, ae_n_epochs=ae_n_epochs,
           batch_size=batch_size, ae_batch_size=ae_batch_size, ae_weight_decay=ae_weight_decay, normal_class=normal_class,

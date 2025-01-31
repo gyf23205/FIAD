@@ -47,21 +47,56 @@ class MLP_Decoder(BaseNet):
 
 class MLP_Physical(BaseNet):
 
-    def __init__(self, x_dim, seq_len, h_dims=[128, 64], rep_dim=32, bias=False):
+    def __init__(self, x_dim, h_dims=[128, 64], rep_dim=32, bias=False):
         super().__init__()
 
         self.rep_dim = rep_dim
         self.encoder = MLP(x_dim, h_dims, rep_dim, bias)
-        self.predictor = MLP_Decoder(int(x_dim//seq_len), list(reversed(h_dims)), rep_dim, bias)
+        # self.predictor = MLP_Decoder(int(x_dim//seq_len), list(reversed(h_dims)), rep_dim, bias)
+        self.predictor = MLP_Decoder(12, list(reversed(h_dims)), rep_dim, bias)
+
+    def forward(self, x):
+        x = self.encoder(x)
+        x_next = self.predictor(x)  
+        return x, x_next
+        
+        
+class MLP_State_Only(BaseNet):
+
+    def __init__(self, x_dim, h_dims=[128, 64], rep_dim=32, bias=False):
+        super().__init__()
+
+        self.rep_dim = rep_dim
+        self.encoder = MLP(x_dim, h_dims, rep_dim, bias)
+        # self.predictor = MLP_Decoder(int(x_dim//seq_len), list(reversed(h_dims)), rep_dim, bias)
+        self.predictor = MLP_Decoder(3, list(reversed(h_dims)), rep_dim, bias)
 
     def forward(self, x):
         x = self.encoder(x)
         x_next = self.predictor(x)
-        if self.training: # Is this ok?     
+        if self.training:   
             return x, x_next
         else:
-            return x
+            return x 
+        
+class MLP_Residual(BaseNet):
 
+    def __init__(self, x_dim, h_dims=[128, 64], rep_dim=32, bias=False):
+        super().__init__()
+        self.rep_dim = rep_dim
+        self.encoder = MLP(x_dim, h_dims, rep_dim, bias)
+        # self.predictor = MLP_Decoder(int(x_dim//seq_len), list(reversed(h_dims)), rep_dim, bias)
+        self.predictor = MLP_Decoder(3, list(reversed(h_dims)), rep_dim, bias)
+
+    def forward(self, x):
+        res = x[:, -7:-4]
+        x = self.encoder(x)
+        x_next = self.predictor(x) + res
+        # if self.training:   
+        return x, x_next
+        # else:
+        #     return x
+        
 class MLP_Autoencoder(BaseNet):
 
     def __init__(self, x_dim, h_dims=[128, 64], rep_dim=32, bias=False):
