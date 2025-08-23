@@ -1,118 +1,29 @@
 # Deep SAD: A Method for Deep Semi-Supervised Anomaly Detection
-This repository provides a [PyTorch](https://pytorch.org/) implementation of the *Deep SAD* method presented in our ICLR 2020 paper ”Deep Semi-Supervised Anomaly Detection”.
+This repository provides a [PyTorch](https://pytorch.org/) implementation of the *PIAD* method presented in our IEEE RA-L paper ”Physics-informed Anomaly Detection for Unmanned Aerial Vehicles”.
 
 
-## The need for semi-supervised anomaly detection
-
-![fig1](imgs/fig1.png?raw=true "fig1")
+## The Overall Framework
+![Framework](imgs/framework.png)
+In this work, we propose a novel physics-informed anomaly detection framework called Physics-informed Prediction for Detection (PIPD) and instantiate the framework into two specific models, PIPDall and PIPDres. The core idea is to embed the dynamics of the target system into the latent space with the  prediction branch. The PIPDall model predicts all the entries at the next time step. The PIPDres model predicts only the future internal states of the target dynamic system.
+![Detection](imgs/detection.png)
+The detection is based on the hypersphere in the latent space. The model is trained to minimize the volume of the hypersphere while keeping the normal data close to the center of the hypersphere and pushing the anomalies away from the center.
 
 
 ## Installation
-This code is written in `Python 3.7` and requires the packages listed in `requirements.txt`.
+To set up the environment, please install the required packages listed in `requirements.txt`:
 
-Clone the repository to your machine and directory of choice:
 ```
-git clone https://github.com/lukasruff/Deep-SAD-PyTorch.git
-```
-
-To run the code, we recommend setting up a virtual environment, e.g. using `virtualenv` or `conda`:
-
-### `virtualenv`
-```
-# pip install virtualenv
-cd <path-to-Deep-SAD-PyTorch-directory>
-virtualenv myenv
-source myenv/bin/activate
 pip install -r requirements.txt
 ```
 
-### `conda`
-```
-cd <path-to-Deep-SAD-PyTorch-directory>
-conda create --name myenv
-source activate myenv
-while read requirement; do conda install -n myenv --yes $requirement; done < requirements.txt
-```
+## Traine and Evaluate
+To train and evaluate the proposed models, run main_all.py and main_res.py, respectively.
 
+To train and evaluate the baseline models, run main_SAD.py, main_RoSAS.py and main_TimesNet.py, respectively.
 
-## Running experiments
-We have implemented the [`MNIST`](http://yann.lecun.com/exdb/mnist/), 
-[`Fashion-MNIST`](https://research.zalando.com/welcome/mission/research-projects/fashion-mnist/), and 
-[`CIFAR-10`](https://www.cs.toronto.edu/~kriz/cifar.html) datasets as well as the classic anomaly detection
-benchmark datasets `arrhythmia`, `cardio`, `satellite`, `satimage-2`, `shuttle`, and `thyroid` from the 
-Outlier Detection DataSets (ODDS) repository ([http://odds.cs.stonybrook.edu/](http://odds.cs.stonybrook.edu/))
-as reported in the paper. 
+## Experiments
+![Detection Results](imgs/table.png)
+We validate our framework using emulated Global Navigation Satellite System (GNSS) spoofing attacks with linear and sinusoidal profiles, which are covered under different noise levels. The simulation results present a performance improvement of up to 17.77\% in the ROC-AUC score of our models compared to the baselines.
 
-The implemented network architectures are as reported in the appendix of the paper.
-
-### Deep SAD
-You can run Deep SAD experiments using the `main.py` script.    
-
-Here's an example on `MNIST` with `0` considered to be the normal class and having 1% labeled (known) training samples 
-from anomaly class `1` with a pollution ratio of 10% of the unlabeled training data (with unknown anomalies from all 
-anomaly classes `1`-`9`):
-```
-cd <path-to-Deep-SAD-PyTorch-directory>
-
-# activate virtual environment
-source myenv/bin/activate  # or 'source activate myenv' for conda
-
-# create folders for experimental output
-mkdir log/DeepSAD
-mkdir log/DeepSAD/mnist_test
-
-# change to source directory
-cd src
-
-# run experiment
-python main.py mnist mnist_LeNet ../log/DeepSAD/mnist_test ../data --ratio_known_outlier 0.01 --ratio_pollution 0.1 --lr 0.0001 --n_epochs 150 --lr_milestone 50 --batch_size 128 --weight_decay 0.5e-6 --pretrain True --ae_lr 0.0001 --ae_n_epochs 150 --ae_batch_size 128 --ae_weight_decay 0.5e-3 --normal_class 0 --known_outlier_class 1 --n_known_outlier_classes 1;
-```
-Have a look into `main.py` for all possible arguments and options.
-
-### Baselines
-We also provide an implementation of the following baselines via the respective `baseline_<method_name>.py` scripts:
-OC-SVM (`ocsvm`), Isolation Forest (`isoforest`), Kernel Density Estimation (`kde`), kernel Semi-Supervised Anomaly 
-Detection (`ssad`), and Semi-Supervised Deep Generative Model (`SemiDGM`).
-
-Here's how to run SSAD for example on the same experimental setup as above:
-```
-cd <path-to-Deep-SAD-PyTorch-directory>
-
-# activate virtual environment
-source myenv/bin/activate  # or 'source activate myenv' for conda
-
-# create folder for experimental output
-mkdir log/ssad
-mkdir log/ssad/mnist_test
-
-# change to source directory
-cd src
-
-# run experiment
-python baseline_ssad.py mnist ../log/ssad/mnist_test ../data --ratio_known_outlier 0.01 --ratio_pollution 0.1 --kernel rbf --kappa 1.0 --normal_class 0 --known_outlier_class 1 --n_known_outlier_classes 1;
-```
-
-The autoencoder is provided through Deep SAD pre-training using `--pretrain True` with `main.py`. 
-To then run a hybrid approach using one of the classic methods on top of autoencoder features, simply point to the saved
-autoencoder model using `--load_ae ../log/DeepSAD/mnist_test/model.tar` and set `--hybrid True`.
-
-To run hybrid SSAD for example on the same experimental setup as above:
-```
-cd <path-to-Deep-SAD-PyTorch-directory>
-
-# activate virtual environment
-source myenv/bin/activate  # or 'source activate myenv' for conda
-
-# create folder for experimental output
-mkdir log/hybrid_ssad
-mkdir log/hybrid_ssad/mnist_test
-
-# change to source directory
-cd src
-
-# run experiment
-python baseline_ssad.py mnist ../log/hybrid_ssad/mnist_test ../data --ratio_known_outlier 0.01 --ratio_pollution 0.1 --kernel rbf --kappa 1.0 --hybrid True --load_ae ../log/DeepSAD/mnist_test/model.tar --normal_class 0 --known_outlier_class 1 --n_known_outlier_classes 1;
-```
-
-## License
-MIT
+![Landscape](imgs/all_lands.png)
+Unlike typical physics-informed frameworks, which often sharpen the loss landscape, our framework further smoothens it, thereby facilitating an efficient training process.
