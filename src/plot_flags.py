@@ -5,7 +5,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 method = 1
 data_path = './data/spoofing'
-signals = np.load(os.path.join(data_path, 'data_unscaled_log_attack.npy'))
+signals = np.load(os.path.join(data_path, 'data_unscaled_multi_noise.npy'))
 scaler = StandardScaler().fit(signals)
 signals_standard = scaler.transform(signals)
 # Scale to range [0,1]

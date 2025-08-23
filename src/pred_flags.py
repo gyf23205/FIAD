@@ -1,4 +1,5 @@
 import torch
+import pickle
 import numpy as np
 import os
 import setting
@@ -15,19 +16,19 @@ def choose_best_r(fpr, tpr, thresholds):
         ratio.append((tpr[i+1]-tpr[i])/(fpr[i+1]-fpr[i]+eps))
     
     # return thresholds[np.argmax(ratio)]
-    return thresholds[1]
+    return thresholds[5]
 
 if __name__=='__main__':
     method = 1
     data_path = './data/spoofing'
     if method == 0:
-        model_path = '/home/yifan/git/FIAD/model/vanilla/model_0005_02/model.tar'
+        model_path = '/home/yifan/git/FIAD/model/vanilla/model_0001_02/model.tar'
         setting.init([512, 512, 1024])
     elif method == 1:
-        model_path = '/home/yifan/git/FIAD/model/physical/model_0005_01/model_physical_normalized.tar'
+        model_path = '/home/yifan/git/FIAD/model/physical/model_0001_02/model_physical.tar'
         setting.init([512, 512, 1024])
     elif method == 2:
-        model_path = '/home/yifan/git/FIAD/model/physical_res/model_0005_02/model_physical_res.tar'
+        model_path = '/home/yifan/git/FIAD/model/physical_res/model_0001_02/model_physical_res.tar'
         setting.init([256, 256, 512])
     elif method == 3:
         model_path = '/home/yifan/git/FIAD/model/physical/model_0005_02/model_physical_state_only.tar'
@@ -38,7 +39,7 @@ if __name__=='__main__':
     net_name = 'spoof_mlp'
 
     # Load data
-    attack_type = 2
+    attack_type = 1
     if attack_type == 0:
         signals = np.load(os.path.join(data_path, 'data_unscaled_multi_noise.npy'))
         labels = np.load(os.path.join(data_path, 'labels_unscaled_multi_noise.npy'))
@@ -49,14 +50,17 @@ if __name__=='__main__':
         signals = np.load(os.path.join(data_path, 'data_unscaled_log_attack.npy'))
         labels = np.load(os.path.join(data_path, 'labels_unscaled_log_attack.npy'))
 
+    # Currently use whole bathc normalization. May change to per-sample normalization.
+    # scaler = StandardScaler().fit(signals)
+    # signals_standard = scaler.transform(signals)
 
-    scaler = StandardScaler().fit(signals)
-    signals_standard = scaler.transform(signals)
-
-    # # Scale to range [0,1]
-    minmax_scaler = MinMaxScaler().fit(signals_standard)
-    signals = minmax_scaler.transform(signals_standard)
+    # # # Scale to range [0,1]
+    # minmax_scaler = MinMaxScaler().fit(signals_standard)
+    # signals = minmax_scaler.transform(signals_standard)
     
+    with open('examples/params.pkl', 'rb') as f:
+        params = pickle.load(f)
+
     seq_len = 100
     n_dim = 12
     signals_batched = np.zeros((len(signals)-seq_len+1, seq_len*n_dim))
@@ -84,20 +88,20 @@ if __name__=='__main__':
     print('AUC-ROC: ', 100. * roc_auc_score(labels_batched, dist))
     assert len(y_pred) == len(labels_batched)
     if method==0:
-        np.save('y_pred.npy', y_pred)
-        np.save('labels.npy', labels_batched)
+        np.save('results/y_pred.npy', y_pred)
+        np.save('results/labels.npy', labels_batched)
     elif method==1:
-        np.save('y_pred_physical.npy', y_pred)
-        np.save('labels_physical.npy', labels_batched)
+        np.save('results/y_pred_physical.npy', y_pred)
+        np.save('results/labels_physical.npy', labels_batched)
     elif method == 2:
-        np.save('y_pred_physical_res.npy', y_pred)
-        np.save('labels_physical_res.npy', labels_batched)
+        np.save('results/y_pred_physical_res.npy', y_pred)
+        np.save('results/labels_physical_res.npy', labels_batched)
     elif method == 3:
-        np.save('y_pred_physical_state_only.npy', y_pred)
-        np.save('labels_physical_state_only.npy', labels_batched)
+        np.save('results/y_pred_physical_state_only.npy', y_pred)
+        np.save('results/labels_physical_state_only.npy', labels_batched)
     else:
-        np.save('y_pred_physical_init.npy', y_pred)
-        np.save('labels_physical_init.npy', labels_batched)
+        np.save('results/y_pred_physical_init.npy', y_pred)
+        np.save('results/labels_physical_init.npy', labels_batched)
     # plt.plot(y_pred)
     # plt.plot(labels_batched)
     # plt.show()

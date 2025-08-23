@@ -37,9 +37,12 @@ class SpoofingDatasetStateOnly(BaseADDataset):
         path = os.path.join(root,'spoofing')
         # signals = np.load(os.path.join(path,'data_batched.npy'))
         # signals_next = np.load(os.path.join(path, 'next_batched.npy'))
-        signals = np.load(os.path.join(path,'data_state_only.npy'))
-        signals_next = np.load(os.path.join(path, 'next_state_only.npy'))
-        flags = np.load(os.path.join(path,'labels_state_only.npy'))
+        signals = np.load(os.path.join(path,'data_wind_state_only.npy'))
+        signals_next = np.load(os.path.join(path, 'next_wind_state_only.npy'))
+        flags = np.load(os.path.join(path,'labels_wind_state_only.npy'))
+        # signals = np.load(os.path.join(path,'data_impulse_state_only.npy'))
+        # signals_next = np.load(os.path.join(path, 'next_impulse_state_only.npy'))
+        # flags = np.load(os.path.join(path,'labels_impulse_state_only.npy'))
         idx_norm = flags==0
         idx_out = flags==1
 

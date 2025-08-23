@@ -28,9 +28,9 @@ class SpoofingDataset(BaseADDataset):
 
         # Load data
         test_ratio = 0.2
-        path = os.path.join(root,'balanced_attack')
-        signals = np.load(os.path.join(path,'innovations_batched.npy'))
-        flags = np.load(os.path.join(path,'flags_batched.npy'))
+        path = os.path.join(root,'spoofing')
+        signals = np.load(os.path.join(path,'data_multi_noise_batched_seq.npy'))
+        flags = np.load(os.path.join(path,'labels_multi_noise_batched_seq.npy'))
         idx_norm = flags==0
         idx_out = flags==1
 
@@ -68,10 +68,10 @@ class SpoofingDataset(BaseADDataset):
         # Subset train_+set to semi_supervised setup
         self.train_set = Subset(train_set, idx)
         # self.val_set = MySpoofing(X_val, y_val)
-        self.val_set = MySpoofing(X_train, y_train)
-        
+        self.val_set = MySpoofing(X_val, y_val)
+
         #Get test set
-        # self.test_set = MySpoofing(X_test, y_test)
+        self.test_set = MySpoofing(X_test, y_test)
         
 
 

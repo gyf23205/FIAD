@@ -7,3 +7,7 @@
 wandb/**
 src/wandb/**
 /data/*
+**/*.npy
+checkpoints/**
+log/**
+results/**

@@ -1,60 +1,40 @@
-import torch
-import logging
-from datetime import datetime
 import numpy as np
-import os
-import setting
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
+import matplotlib as mpl
+# mpl.rcParams['font.size'] = 14
+mpl.rcParams['text.usetex'] = True
 
-from sklearn.metrics import roc_curve
-from DeepSAD import DeepSAD
-from datasets.main import load_dataset
-from matplotlib import pyplot as plt
-from base.spoofing_dataset import MySpoofing
+inputs = np.load('/home/yifan/git/FIAD/data/spoofing/data_unscaled_multi_noise.npy')
+labels = np.load('/home/yifan/git/FIAD/data/spoofing/labels_unscaled_multi_noise.npy')
+scaler = StandardScaler().fit(inputs)
+inputs_standard = scaler.transform(inputs)
+minmax_scaler = MinMaxScaler().fit(inputs_standard)
+inputs = minmax_scaler.transform(inputs_standard)
 
-if __name__=='__main__':
-
-    device = 'cuda' if torch.cuda.is_available() else 'cpu'
-    dataset_name = 'spoofing_physical'
-    net_name = 'spoof_mlp'
-    xp_path = './log/DeepSAD/spoofing_physical/test'
-    model_path = './model/physical/model_physical.tar'
-    data_path = './data/spoofing'
-    setting.init([])
-
-    # Set up logging
-    logging.basicConfig(level=logging.INFO)
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    time = datetime.now().strftime("%d_%m_%Y-%H_%M_%S")
-    log_file = xp_path + '/log-'+ time + '.txt'
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setLevel(logging.INFO)
-    file_handler.setFormatter(formatter)
-    logger.addHandler(file_handler)
-
-    # Load model
-    deepSAD = DeepSAD(eta=1.0)
-    deepSAD.set_network(net_name)
-    deepSAD.load_model(model_path=model_path, load_ae=False, map_location=device)
-    net = deepSAD.net
-    c = deepSAD.c
-
-    # Load data
-    signals = np.load(os.path.join(data_path, 'data_unscaled_multi_noise.npy'))
-    labels = np.load(os.path.join(data_path, 'labels_unscaled_multi_noise.npy'))
-
-    dataset = MySpoofing(signals, labels)
-    scores = []
-    # Predict
-    for signal, _, _,_ in dataset:
-        output = net(signal)
-        dist = (output - c) ** 2
-        scores.append(dist.numpy())
-    
-    scores = np.array(scores)
-    fpr, tpr, threshold = roc_curve(labels, scores, pos_label=1)
-
-    print(fpr)
-    print(tpr)
-    print(threshold)
+legend = ['SP Y', 'SP X', 'SP Z', 'Residual Y', 'Res X', 'Res Z', 'Est Y', 'Est X', 'Est Z', 'GPS latitude', 'GPS Lon', 'GPS Alt']
+# fig, axs = plt.subplots(2, 2)
+# for i in range(4):
+#     temp = inputs[10*i:10*i+100, :]
+#     scaler = StandardScaler().fit(temp)
+#     temp_standard = scaler.transform(temp)
+#     minmax_scaler = MinMaxScaler().fit(temp_standard)
+#     temp = minmax_scaler.transform(temp_standard)
+#     axs[i//2, int(i%2)].plot(temp[:, 3:6])
+labels[labels==0]=-1
+labels = -labels
+plt.figure(figsize=(12, 5))
+plt.plot(inputs[:, 3])
+plt.plot(inputs[:, 9])
+st = np.where(labels==-1)[0][0]
+ed = np.where(labels==-1)[0][-1]
+plt.axvspan(st, ed, color='red', alpha=0.3)
+# plt.plot(labels)
+plt.xticks(fontsize=16)
+plt.yticks([-1, 0, 1], fontsize=16)
+plt.xlabel('Time steps', size=19)
+plt.ylabel('Normalized values', size=19)
+plt.legend([legend[3], legend[9], 'Attacked region'], fontsize=17)
+# plt.legend(['Attack flags'])
+plt.savefig('example_flight.pdf', bbox_inches='tight')
+plt.show()

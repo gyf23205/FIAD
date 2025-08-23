@@ -35,11 +35,15 @@ class SpoofingDatasetPhysical(BaseADDataset):
         test_ratio = 0.2
         # test_ratio = 0.0001
         path = os.path.join(root,'spoofing')
-        # signals = np.load(os.path.join(path,'data_batched.npy'))
-        # signals_next = np.load(os.path.join(path, 'next_batched.npy'))
-        signals = np.load(os.path.join(path,'data_multi_noise_batched_normalize_per_sample.npy'))
-        signals_next = np.load(os.path.join(path, 'next_multi_noise_batched_normalize_per_sample.npy'))
-        flags = np.load(os.path.join(path,'labels_multi_noise_batched_normalize_per_sample.npy'))
+        # signals = np.load(os.path.join(path,'data_multi_noise_batched.npy'))
+        # signals_next = np.load(os.path.join(path, 'next_multi_noise_batched.npy'))
+        # flags = np.load(os.path.join(path,'labels_multi_noise_batched.npy'))
+        signals = np.load(os.path.join(path,'data_wind.npy'))
+        signals_next = np.load(os.path.join(path, 'next_wind.npy'))
+        flags = np.load(os.path.join(path,'labels_wind.npy'))
+        # signals = np.load(os.path.join(path,'data_impulse.npy'))
+        # signals_next = np.load(os.path.join(path, 'next_impulse.npy'))
+        # flags = np.load(os.path.join(path,'labels_impulse.npy'))
         idx_norm = flags==0
         idx_out = flags==1
 
@@ -81,14 +85,13 @@ class SpoofingDatasetPhysical(BaseADDataset):
                                                         ratio_known_normal, ratio_known_outlier, ratio_pollution)
         train_set.semi_targets[idx] = torch.tensor(semi_targets)
 
+        self.X_train, self.y_train, self.semi_y, self.X_test, self.y_test, self.X_val, self.y_val = X_train, y_train, np.array(semi_targets), X_test, y_test, X_val, y_val
         # Subset train_+set to semi_supervised setup
         self.train_set = Subset(train_set, idx)
         self.val_set = MySpoofing(X_val, y_val)
         
         #Get test set
-        self.test_set = MySpoofing(X_val, y_val)
-        
-
+        self.test_set = MySpoofing(X_test, y_test)
 
     def loaders(self, batch_size: int, shuffle_train=True, shuffle_test=False, num_workers: int = 0) -> tuple[DataLoader, DataLoader]:
         train_loader = DataLoader(dataset=self.train_set, batch_size=batch_size, shuffle=shuffle_train,
@@ -99,3 +102,5 @@ class SpoofingDatasetPhysical(BaseADDataset):
                                  num_workers=num_workers, drop_last=False)
         return train_loader, val_loader, test_loader
 
+    def data_direct(self):
+        return self.X_train, self.y_train, self.semi_y, self.X_test, self.y_test, self.X_val, self.y_val

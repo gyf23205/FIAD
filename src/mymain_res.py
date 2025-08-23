@@ -148,7 +148,7 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
                   weight_pred=weight_pred)
 
     # Test model
-    deepSAD.test_physical(dataset, device=device, n_jobs_dataloader=n_jobs_dataloader)
+    deepSAD.test_physical(dataset, device=device, n_jobs_dataloader=n_jobs_dataloader) # Need to comment this line if want to save the pred branch and also the end of train_physical
 
     # Save results, model, and configuration
     deepSAD.save_results(export_json=model_path + f'/results_physical_res.json')
@@ -164,11 +164,11 @@ if __name__ == '__main__':
     net_name = 'spoof_mlp_res'
     xp_path = './log/DeepSAD/spoofing_physical' # Log path
     data_path = './data'
-    ratio_known_outlier = 0.005
-    ratio_pollution = 0.1
+    ratio_known_outlier = 0.003
+    ratio_pollution = 0.05
     rko = str(ratio_known_outlier).replace('.','')
     rp = str(ratio_pollution).replace('.','')
-    model_path = f'./model/physical_res/model_{rko}_{rp}'
+    model_path = f'./saved_model/physical_res/model_{rko}_{rp}'
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     lr = 0.0001

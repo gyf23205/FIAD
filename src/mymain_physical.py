@@ -148,12 +148,12 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
                   weight_pred=weight_pred)
 
     # Test model
-    deepSAD.test_physical(dataset, device=device, n_jobs_dataloader=n_jobs_dataloader)
+    deepSAD.test_physical(dataset, device=device, n_jobs_dataloader=n_jobs_dataloader) # Need to comment this line if want to save the pred branch and also the end of train_physical
 
     # Save results, model, and configuration
-    deepSAD.save_results(export_json=model_path + f'/results_physical_normalized.json')
-    deepSAD.save_model(export_model=model_path + f'/model_physical_normalized.tar', save_ae=pretrain)
-    cfg.save_config(export_json=model_path + f'/config_physical_normalized.json')
+    deepSAD.save_results(export_json=model_path + f'/results_physical.json')
+    deepSAD.save_model(export_model=model_path + f'/model_physical.tar', save_ae=pretrain)
+    cfg.save_config(export_json=model_path + f'/config_physical.json')
 
 
 if __name__ == '__main__':
@@ -164,11 +164,12 @@ if __name__ == '__main__':
     net_name = 'spoof_mlp'
     xp_path = './log/DeepSAD/spoofing_physical' # Log path
     data_path = './data'
-    ratio_known_outlier = 0.005
-    ratio_pollution = 0.1
+    ratio_known_outlier = 0.003
+    ratio_known_normal = 0
+    ratio_pollution = 0.05
     rko = str(ratio_known_outlier).replace('.','')
     rp = str(ratio_pollution).replace('.','')
-    model_path = f'./model/physical/model_{rko}_{rp}'
+    model_path = f'./saved_model/physical/model_{rko}_{rp}'
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     lr = 0.0001
@@ -198,6 +199,7 @@ if __name__ == '__main__':
             'dataset':'unscaled',
            'ratio_known_outlier': ratio_known_outlier,
            'ratio_pollution': ratio_pollution,
+           'ratio_known_normal':ratio_known_normal,
            'lr': lr,
            'batch size': batch_size,
            'weight decay': weight_decay,
@@ -213,7 +215,7 @@ if __name__ == '__main__':
     seed = 4
 
     main(dataset_name, net_name, xp_path, data_path, eta=eta, ratio_known_outlier=ratio_known_outlier,
-          ratio_pollution=ratio_pollution, lr=lr, n_epochs=n_epochs, lr_milestone=lr_milestone,
+          ratio_pollution=ratio_pollution, ratio_known_normal = ratio_known_normal, lr=lr, n_epochs=n_epochs, lr_milestone=lr_milestone,
           weight_decay=weight_decay, pretrain=pretrain, ae_lr=ae_lr, ae_n_epochs=ae_n_epochs,
           batch_size=batch_size, ae_batch_size=ae_batch_size, ae_weight_decay=ae_weight_decay, normal_class=normal_class,
           known_outlier_class=known_outlier_class, n_known_outlier_classes=n_known_outlier_classes,seed=seed, weight_pred=weight_pred)

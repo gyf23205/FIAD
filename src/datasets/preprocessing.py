@@ -2,6 +2,7 @@ import numpy as np
 import os
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import logging
+import pickle
 
 def create_semisupervised_setting(labels, normal_classes, outlier_classes, known_outlier_classes,
                                   ratio_known_normal, ratio_known_outlier, ratio_pollution):
@@ -70,49 +71,79 @@ def create_semisupervised_setting(labels, normal_classes, outlier_classes, known
 
     return list_idx, list_labels, list_semi_labels
 
+def normalization(data):
+    mu = np.mean(data, axis=0)
+    std = np.std(data, axis=0)
+    eps = 1e-7
+    data_std = (data - mu) / (std + eps)
+    data_scaled = (data_std - np.min(data_std, axis=0))/(np.max(data_std, axis=0) - np.min(data_std, axis=0) + eps)
+    params = {'mu':mu, 'std':std, 'min':np.min(data_std, axis=0), 'max':np.max(data_std, axis=0)}
+    with open('/home/yifan/git/qualisys_drone_sdk/examples/params.pkl', 'wb') as f:
+        pickle.dump(params, f)
+    return data_scaled
 
-def batch_sequential(root):
+def batch_sequential():
     seq_len = 100
-    signal_path = os.path.join(root,'innovations.npy')
-    flags_path = os.path.join(root,'flags.npy')
-    signals = np.load(signal_path)
+    signal_path = os.path.join(source,'traj_log.npy')
+    flags_path = os.path.join(source,'flag_log.npy')
+    # signal_path = os.path.join(source,'traj_log.npy')
+    # flags_path = os.path.join(source,'flag_log.npy')
+    signals = np.load(signal_path)[:, 0:12]
     flags = np.load(flags_path)
     print(signals.shape)
+    n_channels = signals.shape[-1]
 
-    # Standardize data (per feature Z-normalization, i.e. zero-mean and unit variance)
-    scaler = StandardScaler().fit(signals)
-    signals_standard = scaler.transform(signals)
+    signals_scaled = normalization(signals)
+    signals_batched = np.zeros((len(signals_scaled)-seq_len+1, seq_len, n_channels))
+    # flags_batched = np.zeros((len(signals_scaled)-seq_len+1))
+    flags_batched = np.zeros((len(signals_scaled)-seq_len+1, seq_len))
 
-    # Scale to range [0,1]
-    minmax_scaler = MinMaxScaler().fit(signals_standard)
-    signals_scaled = minmax_scaler.transform(signals_standard)
-
-    signals_batched = np.zeros((len(signals_scaled)-seq_len+1, seq_len, 8))
-    flags_batched = np.zeros(len(signals_scaled)-seq_len+1)
     for i in range(len(signals_scaled)-seq_len+1):
         signals_batched[i,:,:] = signals_scaled[i:i+seq_len,:]
-        flags_batched[i] = 1 if np.sum(flags[i:i+seq_len])>0 else 0
-    np.save(os.path.join(root, 'innovations_batched.npy'), signals_batched)
-    np.save(os.path.join(root, 'flags_batched.npy'),flags_batched)
+        # flags_batched[i] = 1 if np.sum(flags[i:i+seq_len])>0 else 0
+        flags_batched[i, :] = flags[i:i+seq_len]
+    np.save(os.path.join(root, 'data_wind_seq.npy'), signals_batched)
+    np.save(os.path.join(root, 'labels_wind_seq.npy'),flags_batched)
 
-def batch_sequential_flat(root):
-    seq_len = 100
-    # signal_path = os.path.join(root,'data.npy')
+def build_next(root):
     signal_path = os.path.join(root,'data_unscaled_multi_noise.npy')
     flags_path = os.path.join(root,'labels_unscaled_multi_noise.npy')
-    signals = np.load(signal_path)
+    signals = np.squeeze(np.load(signal_path))
+    flags = np.load(flags_path)
+    seq_len = 100
+    n_samples = signals.shape[0] - 1
+    n_channels = 12
+    next_real = np.empty((n_samples, n_channels))
+    pad = np.zeros((seq_len - 1,))
+    flags = np.concatenate([pad, flags], axis=0)
+    labels = np.empty((n_samples,))
+    for i in range(n_samples):
+        next_real[i, :] = signals[i+1, -12:]
+        labels[i] = 1 if np.sum(flags[i:i+seq_len]) > 0 else 0
+    np.save(os.path.join(root, 'data_real.npy'), signals[:-1, :])
+    np.save(os.path.join(root, 'next_real.npy'), next_real)
+    np.save(os.path.join(root, 'labels_real.npy'),labels)
+
+
+def batch_sequential_flat():
+    seq_len = 100
+    # signal_path = os.path.join(root,'data.npy')
+    signal_path = os.path.join(source,'traj_log.npy')
+    flags_path = os.path.join(source,'flag_log.npy')
+    signals = np.load(signal_path)[:, 0:12]
     flags = np.load(flags_path)
     num_channels = signals.shape[-1]
     print(signals.shape)
 
-    # Standardize data (per feature Z-normalization, i.e. zero-mean and unit variance)
-    scaler = StandardScaler().fit(signals)
-    signals_standard = scaler.transform(signals)
+    # # Standardize data (per feature Z-normalization, i.e. zero-mean and unit variance)
+    # scaler = StandardScaler().fit(signals)
+    # signals_standard = scaler.transform(signals)
 
-    # # Scale to range [0,1]
-    minmax_scaler = MinMaxScaler().fit(signals_standard)
-    signals_scaled = minmax_scaler.transform(signals_standard)
+    # # # Scale to range [0,1]
+    # minmax_scaler = MinMaxScaler().fit(signals_standard)
+    # signals_scaled = minmax_scaler.transform(signals_standard)
 
+    signals_scaled = normalization(signals)
     # Each sample move forward one time step
     num_samples = len(signals_scaled)-seq_len
     num_state = 3
@@ -125,31 +156,31 @@ def batch_sequential_flat(root):
         #     signals_batched[i,j*seq_len:(j+1)*seq_len] = signals[i:i+seq_len,j]
         signals_next_batched[i, :] = signals_scaled[i+seq_len,:]
         labels_batched[i] = 1 if np.sum(flags[i:i+seq_len])>0 else 0
-    np.save(os.path.join(root, 'data_multi_noise_batched.npy'), signals_batched)
-    np.save(os.path.join(root, 'next_multi_noise_batched.npy'), signals_next_batched)
-    np.save(os.path.join(root, 'labels_multi_noise_batched.npy'),labels_batched)
+    np.save(os.path.join(target, 'data_wind.npy'), signals_batched)
+    np.save(os.path.join(target, 'next_wind.npy'), signals_next_batched)
+    np.save(os.path.join(target, 'labels_wind.npy'),labels_batched)
     # np.save(os.path.join(root, 'data_unscaled_multi_noise_batched.npy'), signals_batched)
     # np.save(os.path.join(root, 'next_unscaled_multi_noise_batched.npy'), signals_next_batched)
     # np.save(os.path.join(root, 'labels_unscaled_multi_noise_batched.npy'),labels_batched)
 
-def batch_sequential_flat_state_only(root):
+def batch_sequential_flat_state_only():
     seq_len = 100
     # signal_path = os.path.join(root,'data.npy')
-    signal_path = os.path.join(root,'data_unscaled_multi_noise.npy')
-    flags_path = os.path.join(root,'labels_unscaled_multi_noise.npy')
-    signals = np.load(signal_path)
+    signal_path = os.path.join(source,'traj_log.npy')
+    flags_path = os.path.join(source,'flag_log.npy')
+    signals = np.load(signal_path)[:, 0:12]
     flags = np.load(flags_path)
     num_channels = signals.shape[-1]
     print(signals.shape)
 
     # Standardize data (per feature Z-normalization, i.e. zero-mean and unit variance)
-    scaler = StandardScaler().fit(signals)
-    signals_standard = scaler.transform(signals)
+    # scaler = StandardScaler().fit(signals)
+    # signals_standard = scaler.transform(signals)
 
     # # Scale to range [0,1]
-    minmax_scaler = MinMaxScaler().fit(signals_standard)
-    signals_scaled = minmax_scaler.transform(signals_standard)
-
+    # minmax_scaler = MinMaxScaler().fit(signals_standard)
+    # signals_scaled = minmax_scaler.transform(signals_standard)    
+    signals_scaled = normalization(signals)
     # Each sample move forward one time step
     num_samples = len(signals_scaled)-seq_len
     num_state = 3
@@ -160,55 +191,59 @@ def batch_sequential_flat_state_only(root):
         signals_batched[i,:] = signals_scaled[i:i+seq_len,:].reshape((seq_len*num_channels,))
         # for j in range(num_channels):
         #     signals_batched[i,j*seq_len:(j+1)*seq_len] = signals[i:i+seq_len,j]
-        signals_next_batched[i, :] = signals_scaled[i+seq_len, 6:9]
+        signals_next_batched[i, :] = signals_scaled[i+seq_len, 3:6]
         labels_batched[i] = 1 if np.sum(flags[i:i+seq_len])>0 else 0
-    np.save(os.path.join(root, 'data_multi_noise_state_only_batched.npy'), signals_batched)
-    np.save(os.path.join(root, 'next_multi_noise_state_only_batched.npy'), signals_next_batched)
-    np.save(os.path.join(root, 'labels_multi_noise_state_only_batched.npy'),labels_batched)
+    np.save(os.path.join(target, 'data_wind_state_only.npy'), signals_batched)
+    np.save(os.path.join(target, 'next_wind_state_only.npy'), signals_next_batched)
+    np.save(os.path.join(target, 'labels_wind_state_only.npy'),labels_batched)
 
     # np.save(os.path.join(root, 'data_state_only.npy'), signals_batched)
     # np.save(os.path.join(root, 'next_state_only.npy'), signals_next_batched)
     # np.save(os.path.join(root, 'labels_state_only.npy'),labels_batched)
 
-def batch_sequential_flat_normalize_per_sample(root):
-    seq_len = 100
-    # signal_path = os.path.join(root,'data.npy')
-    signal_path = os.path.join(root,'data_unscaled_multi_noise.npy')
-    flags_path = os.path.join(root,'labels_unscaled_multi_noise.npy')
-    signals = np.load(signal_path)
-    flags = np.load(flags_path)
-    num_channels = signals.shape[-1]
-    print(signals.shape)
+# def batch_sequential_flat_normalize_per_sample(root):
+#     seq_len = 100
+#     # signal_path = os.path.join(root,'data.npy')
+#     signal_path = os.path.join(root,'traj_log.npy')
+#     flags_path = os.path.join(root,'flag_log.npy')
+#     signals = np.load(signal_path)
+#     flags = np.load(flags_path)
+#     num_channels = signals.shape[-1]
+#     print(signals.shape)
 
-    # Each sample move forward one time step
-    num_samples = len(signals)-seq_len
-    # num_state = 3
-    signals_batched = np.zeros((num_samples, seq_len*num_channels))
-    signals_next_batched = np.zeros((num_samples, num_channels))
-    labels_batched = np.zeros(num_samples)
-    for i in range(num_samples):
-        temp = signals[i:i+seq_len+1,:]
-        scaler = StandardScaler().fit(temp)
-        temp_standard = scaler.transform(temp)
-        minmax_scaler = MinMaxScaler().fit(temp_standard)
-        temp_scaled = minmax_scaler.transform(temp_standard)
-        signals_batched[i,:] = temp_scaled[:seq_len,:].reshape((seq_len*num_channels,))
-        # for j in range(num_channels):
-        #     signals_batched[i,j*seq_len:(j+1)*seq_len] = signals[i:i+seq_len,j]
-        signals_next_batched[i, :] = temp_scaled[seq_len, :]
-        labels_batched[i] = 1 if np.sum(flags[i:i+seq_len])>0 else 0
-    np.save(os.path.join(root, 'data_multi_noise_batched_normalize_per_sample.npy'), signals_batched)
-    np.save(os.path.join(root, 'next_multi_noise_batched_normalize_per_sample.npy'), signals_next_batched)
-    np.save(os.path.join(root, 'labels_multi_noise_batched_normalize_per_sample.npy'),labels_batched)
+#     # Each sample move forward one time step
+#     num_samples = len(signals)-seq_len
+#     # num_state = 3
+#     signals_batched = np.zeros((num_samples, seq_len*num_channels))
+#     signals_next_batched = np.zeros((num_samples, num_channels))
+#     labels_batched = np.zeros(num_samples)
+#     for i in range(num_samples):
+#         temp = signals[i:i+seq_len+1,:]
+#         scaler = StandardScaler().fit(temp)
+#         temp_standard = scaler.transform(temp)
+#         minmax_scaler = MinMaxScaler().fit(temp_standard)
+#         temp_scaled = minmax_scaler.transform(temp_standard)
+#         signals_batched[i,:] = temp_scaled[:seq_len, :].view((seq_len*num_channels,))
+#         # for j in range(num_channels):
+#         #     signals_batched[i,j*seq_len:(j+1)*seq_len] = signals[i:i+seq_len,j]
+#         signals_next_batched[i, :] = temp_scaled[seq_len, :]
+#         labels_batched[i] = 1 if np.sum(flags[i:i+seq_len]) > 0 else 0
+#     np.save(os.path.join(root, 'data_real_normalize_per_sample.npy'), signals_batched)
+#     np.save(os.path.join(root, 'next_real_normalize_per_sample.npy'), signals_next_batched)
+#     np.save(os.path.join(root, 'labels_real_normalize_per_sample.npy'),labels_batched)
     # np.save(os.path.join(root, 'data_unscaled_multi_noise_batched.npy'), signals_batched)
     # np.save(os.path.join(root, 'next_unscaled_multi_noise_batched.npy'), signals_next_batched)
     # np.save(os.path.join(root, 'labels_unscaled_multi_noise_batched.npy'),labels_batched)
 
 
 if __name__=='__main__':
+    source = '/home/yifan/git/qualisys_drone_sdk'
+    target = '/home/yifan/git/FIAD/data/spoofing'
+    # build_next(root)
     root = '/home/yifan/git/FIAD/data/spoofing'
-    batch_sequential_flat_normalize_per_sample(root)
-    # batch_sequential_flat_state_only(root)
-    # batch_sequential_flat(root)
+    # batch_sequential_flat_normalize_per_sample(root)
+    batch_sequential_flat_state_only()
+    batch_sequential_flat()
+    batch_sequential()
     # x = np.load(os.path.join(root, 'innovations_batched_flat.npy'))
     # print(x.shape)

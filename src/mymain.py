@@ -162,18 +162,19 @@ if __name__ == '__main__':
     net_name = 'spoof_mlp'
     xp_path = './log/DeepSAD/spoofing' # Log path
     data_path = './data'
-    ratio_known_outlier = 0.005
-    ratio_pollution = 0.1
+    ratio_known_outlier = 0.003
+    ratio_known_normal = 0
+    ratio_pollution = 0.05
     rko = str(ratio_known_outlier).replace('.','')
     rp = str(ratio_pollution).replace('.','')
-    model_path = f'./model/vanilla/model_{rko}_{rp}'
+    model_path = f'./saved_model/vanilla/model_{rko}_{rp}'
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     lr = 0.0001
     eta = 5.0
     n_epochs = 300
     lr_milestone = [50]
-    batch_size = 128
+    batch_size = 64
     weight_decay = 0.5e-6
     pretrain = False
     ae_lr = 0.0001
@@ -189,10 +190,11 @@ if __name__ == '__main__':
     
     wandb.init(
         project='PIAD',
-        name='Vanilla hard',
+        name='Vanilla real',
         config={
            'ratio_known_outlier': ratio_known_outlier,
            'ratio_pollution': ratio_pollution,
+           'ratio_known_normal':ratio_known_normal,
            'lr': lr,
            'batch size': batch_size,
            'weight decay': weight_decay,
@@ -207,7 +209,7 @@ if __name__ == '__main__':
     seed = 4
 
     main(dataset_name, net_name, xp_path, data_path, eta=eta, ratio_known_outlier=ratio_known_outlier,
-          ratio_pollution=ratio_pollution, lr=lr, n_epochs=n_epochs, lr_milestone=lr_milestone,
+          ratio_pollution=ratio_pollution, ratio_known_normal=ratio_known_normal, lr=lr, n_epochs=n_epochs, lr_milestone=lr_milestone,
           weight_decay=weight_decay, pretrain=pretrain, ae_lr=ae_lr, ae_n_epochs=ae_n_epochs,
           batch_size=batch_size, ae_batch_size=ae_batch_size, ae_weight_decay=ae_weight_decay, normal_class=normal_class,
           known_outlier_class=known_outlier_class, n_known_outlier_classes=n_known_outlier_classes,seed=seed

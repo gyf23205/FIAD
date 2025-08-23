@@ -182,14 +182,7 @@ class DeepSAD(object):
         self.results['train_time'] = self.trainer.train_time
         self.c = self.trainer.c.cpu().data.numpy().tolist()  # get as list
         self.roc_curve = self.trainer.roc_curve
-        # Test
-        # self.trainer.test(dataset, self.net)
 
-        # Get test results
-        # self.ae_results['test_auc'] = self.ae_trainer.test_auc
-        # self.results['test_time'] = self.trainer.test_time
-
-        # Initialize Deep SAD network weights from pre-trained encoder
         self.create_from_physically_informed() # Comment this line if also want to save the state predictor.
         wandb.log({'best_auc': best_auc})
 

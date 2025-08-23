@@ -168,7 +168,7 @@ if __name__ == '__main__':
     ratio_pollution = 0.2
     rko = str(ratio_known_outlier).replace('.','')
     rp = str(ratio_pollution).replace('.','')
-    model_path = f'./model/physical/model_{rko}_{rp}'
+    model_path = f'./saved_model/physical/model_{rko}_{rp}'
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     lr = 0.0001
