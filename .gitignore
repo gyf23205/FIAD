@@ -11,7 +11,7 @@ checkpoints/**
 log/**
 results/**
 !data/spoofing/*multi_noise_batched.npy
-data/spoofing/*real_multi_noise_batched.npy
+data/**
 !data/spoofing/*multi_noise_state_only.npy
 !data/spoofing/*sin_batched.npy
 !data/spoofing/*sin_seq.npy

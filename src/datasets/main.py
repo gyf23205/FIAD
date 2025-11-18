@@ -6,6 +6,9 @@ from .spoofing_other_attack import SpoofingDatasetOther
 from .spoofing_state_only_other_attack import SpoofingDatasetStateOnlyOther
 from .spoofing_unsupervised import SpoofingDatasetUnsupervised
 from .spoofing_unsupervised_other_attack import SpoofingDatasetUnsupervisedOther
+from .spoofing_multi_anomaly import SpoofingMultiAnomalyPhysical
+from .spoof_wind import SpoofingWindPhysical
+from .ALFA import ALFA
 
 
 def load_dataset(dataset_name, data_path, normal_class, known_outlier_class, n_known_outlier_classes: int = 0,
@@ -14,7 +17,9 @@ def load_dataset(dataset_name, data_path, normal_class, known_outlier_class, n_k
     """Loads the dataset."""
 
     implemented_datasets = ('spoofing', 'spoofing_flat', 'spoofing_physical',
-                                'spoofing_state_only', 'spoofing_other_attack', 'spoofing_state_only_other_attack', 'spoofing_unsupervised','spoofing_unsupervised_other_attack')
+                                'spoofing_state_only', 'spoofing_other_attack', 'spoofing_state_only_other_attack',
+                                'spoofing_unsupervised','spoofing_unsupervised_other_attack',
+                                'spoofing_multi_profile', 'spoofing_wind', 'ALFA')
     assert dataset_name in implemented_datasets
 
     dataset = None
@@ -80,6 +85,7 @@ def load_dataset(dataset_name, data_path, normal_class, known_outlier_class, n_k
                                 ratio_known_outlier=ratio_known_outlier,
                                 ratio_pollution=ratio_pollution,
                                 random_state=random_state)
+        
     if dataset_name == 'spoofing_unsupervised_other_attack':
         dataset = SpoofingDatasetUnsupervisedOther(root=data_path,
                                 dataset_name=dataset_name,
@@ -88,6 +94,32 @@ def load_dataset(dataset_name, data_path, normal_class, known_outlier_class, n_k
                                 ratio_known_outlier=ratio_known_outlier,
                                 ratio_pollution=ratio_pollution,
                                 random_state=random_state)
-
+        
+    if dataset_name == 'spoofing_multi_anomaly':
+        dataset = SpoofingMultiAnomalyPhysical(root=data_path,
+                                dataset_name=dataset_name,
+                                n_known_outlier_classes=n_known_outlier_classes,
+                                ratio_known_normal=ratio_known_normal,
+                                ratio_known_outlier=ratio_known_outlier,
+                                ratio_pollution=ratio_pollution,
+                                random_state=random_state)
+    
+    if dataset_name == 'spoofing_wind':
+        dataset = SpoofingWindPhysical(root=data_path,
+                                dataset_name=dataset_name,
+                                n_known_outlier_classes=n_known_outlier_classes,
+                                ratio_known_normal=ratio_known_normal,
+                                ratio_known_outlier=ratio_known_outlier,
+                                ratio_pollution=ratio_pollution,
+                                random_state=random_state)
+        
+    if dataset_name == 'ALFA':
+        dataset = ALFA(root=data_path,
+                        dataset_name=dataset_name,
+                        n_known_outlier_classes=n_known_outlier_classes,
+                        ratio_known_normal=ratio_known_normal,
+                        ratio_known_outlier=ratio_known_outlier,
+                        ratio_pollution=ratio_pollution,
+                        random_state=random_state)
 
     return dataset

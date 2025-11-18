@@ -4,24 +4,26 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler
 import logging
 import pickle
 
-def create_semisupervised_setting(labels, normal_classes, outlier_classes, known_outlier_classes,
+def create_semisupervised_setting(labels, normal_classes, unknown_outlier_classes, known_outlier_classes,
                                   ratio_known_normal, ratio_known_outlier, ratio_pollution):
     """
     Create a semi-supervised data setting. 
     :param labels: np.array with labels of all dataset samples
     :param normal_classes: tuple with normal class labels
-    :param outlier_classes: tuple with anomaly class labels
-    :param known_outlier_classes: tuple with known (labeled) anomaly class labels
-    :param ratio_known_normal: the desired ratio of known (labeled) normal samples
-    :param ratio_known_outlier: the desired ratio of known (labeled) anomalous samples
+    :param unknown_outlier_classes: tuple with unknown anomaly class labels
+    :param known_outlier_classes: tuple with known anomaly class labels
+    :param ratio_known_normal: the desired ratio of labeled normal samples
+    :param ratio_known_outlier: the desired ratio of labeled anomalous samples
     :param ratio_pollution: the desired pollution ratio of the unlabeled data with unknown (unlabeled) anomalies.
     :return: tuple with list of sample indices, list of original labels, and list of semi-supervised labels
+    (-1: unlabeled, 0: known normal, >1: known anomaly)
     """
     logger = logging.getLogger()
 
     idx_normal = np.argwhere(np.isin(labels, normal_classes)).flatten()
-    idx_outlier = np.argwhere(np.isin(labels, outlier_classes)).flatten()
-    idx_known_outlier_candidates = np.argwhere(np.isin(labels, known_outlier_classes)).flatten()
+    idx_unknown_outlier = np.argwhere(np.isin(labels, unknown_outlier_classes)).flatten()
+    idx_known_outlier = np.argwhere(np.isin(labels, known_outlier_classes)).flatten()
+    idx_all_outlier = np.concatenate((idx_unknown_outlier, idx_known_outlier), axis=0)
 
     n_normal = len(idx_normal)
 
@@ -35,39 +37,44 @@ def create_semisupervised_setting(labels, normal_classes, outlier_classes, known
     
 
     # Get number of samples
-    n_known_normal = int(x[0])
+    n_labeled_normal = int(x[0])
     n_unlabeled_normal = int(x[1])
     n_unlabeled_outlier = int(x[2])
-    n_known_outlier = int(x[3])
-    logger.info(f'In semi setting: n_known_normal: {n_known_normal}, n_unlabled_normal: {n_unlabeled_normal}, n_unlabeled_outlier: {n_unlabeled_outlier}, n_known_outlier: {n_known_outlier}')
+    n_labeled_outlier = int(x[3])
+    logger.info(f'In semi setting: n_labeled_normal: {n_labeled_normal}, n_unlabeled_normal: {n_unlabeled_normal}, n_unlabeled_outlier: {n_unlabeled_outlier}, n_labeled_outlier: {n_labeled_outlier}')
 
     # Sample indices
     perm_normal = np.random.permutation(n_normal)
-    perm_outlier = np.random.permutation(len(idx_outlier))
-    perm_known_outlier = np.random.permutation(len(idx_known_outlier_candidates))
+    perm_labeled_outlier = np.random.permutation(len(idx_known_outlier))
+    # perm_unknown_outlier = np.random.permutation(len(idx_unknown_outlier))
+    # perm_known_outlier = np.random.permutation(len(idx_known_outlier))
 
-    idx_known_normal = idx_normal[perm_normal[:n_known_normal]].tolist()
-    idx_unlabeled_normal = idx_normal[perm_normal[n_known_normal:n_known_normal+n_unlabeled_normal]].tolist()
-    idx_unlabeled_outlier = idx_outlier[perm_outlier[:n_unlabeled_outlier]].tolist()
-    idx_known_outlier = idx_known_outlier_candidates[perm_known_outlier[:n_known_outlier]].tolist() # A minor bug here when outlier_class and known_outlier_class overlap
+    idx_labeled_normal = idx_normal[perm_normal[:n_labeled_normal]].tolist()
+    idx_unlabeled_normal = idx_normal[perm_normal[n_labeled_normal:n_labeled_normal+n_unlabeled_normal]].tolist()
+    idx_labeled_outlier = idx_known_outlier[perm_labeled_outlier[:n_labeled_outlier]].tolist()
+    # Exclude labeled outliers from all outliers
+    idx_unlabeled_outlier = np.setdiff1d(idx_all_outlier, idx_labeled_outlier)
+    perm_unlabeled_outlier = np.random.permutation(len(idx_unlabeled_outlier))
+    idx_unlabeled_outlier = idx_unlabeled_outlier[perm_unlabeled_outlier[:n_unlabeled_outlier]].tolist()
+
 
     # Get original class labels
-    labels_known_normal = labels[idx_known_normal].tolist()
+    labels_labeled_normal = labels[idx_labeled_normal].tolist()
     labels_unlabeled_normal = labels[idx_unlabeled_normal].tolist()
     labels_unlabeled_outlier = labels[idx_unlabeled_outlier].tolist()
-    labels_known_outlier = labels[idx_known_outlier].tolist()
+    labels_labeled_outlier = labels[idx_labeled_outlier].tolist()
 
     # Get semi-supervised setting labels
-    semi_labels_known_normal = np.ones(n_known_normal).astype(np.int32).tolist()
-    semi_labels_unlabeled_normal = np.zeros(n_unlabeled_normal).astype(np.int32).tolist()
-    semi_labels_unlabeled_outlier = np.zeros(n_unlabeled_outlier).astype(np.int32).tolist()
-    semi_labels_known_outlier = (-np.ones(n_known_outlier).astype(np.int32)).tolist()
+    semi_labels_labeled_normal = np.zeros(n_labeled_normal).astype(np.int32).tolist()
+    semi_labels_unlabeled_normal = (-np.ones(n_unlabeled_normal)).astype(np.int32).tolist()
+    semi_labels_unlabeled_outlier = (-np.ones(n_unlabeled_outlier)).astype(np.int32).tolist()
+    semi_labels_labeled_outlier = labels_labeled_outlier
 
-    # Create final lists
-    list_idx = idx_known_normal + idx_unlabeled_normal + idx_unlabeled_outlier + idx_known_outlier
-    list_labels = labels_known_normal + labels_unlabeled_normal + labels_unlabeled_outlier + labels_known_outlier
-    list_semi_labels = (semi_labels_known_normal + semi_labels_unlabeled_normal + semi_labels_unlabeled_outlier
-                        + semi_labels_known_outlier)
+    # Create final lists, idx_unlabeled_outlier is buggy
+    list_idx = idx_labeled_normal + idx_unlabeled_normal + idx_unlabeled_outlier + idx_labeled_outlier
+    list_labels = labels_labeled_normal + labels_unlabeled_normal + labels_unlabeled_outlier + labels_labeled_outlier
+    list_semi_labels = (semi_labels_labeled_normal + semi_labels_unlabeled_normal + semi_labels_unlabeled_outlier
+                        + semi_labels_labeled_outlier)
 
     return list_idx, list_labels, list_semi_labels
 
