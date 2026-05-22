@@ -49,6 +49,9 @@ class DeepSAD(object):
         self.results = {
             'train_time': None,
             'test_auc': None,
+            'test_f1': None,
+            'test_acc': None,
+            'test_recall': None,
             'test_time': None,
             'test_scores': None,
         }
@@ -83,7 +86,7 @@ class DeepSAD(object):
         self.results['train_time'] = self.trainer.train_time
         self.c = self.trainer.c.cpu().data.numpy().tolist()  # get as list
         self.roc_curve = self.trainer.roc_curve
-        wandb.log({'best_auc': best_auc})
+        wandb.log({'best_val_auc': best_auc})
 
     def test(self, dataset: BaseADDataset, device: str = 'cuda', n_jobs_dataloader: int = 0):
         """Tests the Deep SAD model on the test data."""
@@ -97,6 +100,10 @@ class DeepSAD(object):
         self.results['test_auc'] = self.trainer.test_auc
         self.results['test_time'] = self.trainer.test_time
         self.results['test_scores'] = self.trainer.test_scores
+        self.results['test_f1'] = self.trainer.test_f1
+        self.results['test_acc'] = self.trainer.test_acc
+        self.results['test_recall'] = self.trainer.test_recall
+        wandb.log(self.results)
 
     def test_physical(self, dataset: BaseADDataset, device: str = 'cuda', n_jobs_dataloader: int = 0):
         """Tests the Deep SAD model on the test data."""
@@ -107,6 +114,11 @@ class DeepSAD(object):
         self.results['test_auc'] = self.trainer.test_auc
         self.results['test_time'] = self.trainer.test_time
         self.results['test_scores'] = self.trainer.test_scores
+        self.results['test_f1_macro'] = self.trainer.test_f1_macro
+        self.results['test_f1_weighted'] = self.trainer.test_f1_weighted
+        self.results['test_acc'] = self.trainer.test_acc
+        self.results['test_recall'] = self.trainer.test_recall
+        wandb.log(self.results)
 
     def pretrain(self, dataset: BaseADDataset, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 100,
                  lr_milestones: tuple = (), batch_size: int = 128, weight_decay: float = 1e-6, device: str = 'cuda',
@@ -161,7 +173,7 @@ class DeepSAD(object):
 
     def train_physical(self, dataset: BaseADDataset, n_outlier_classes: int, known_outlier_classes, coeff: dict, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 100,
                 lr_milestones: tuple = (), batch_size: int = 128, weight_decay: float = 1e-6, device: str = 'cuda',
-                n_jobs_dataloader: int = 0, tau=0.1):
+                n_jobs_dataloader: int = 0, tau=0.1, model_path=None, save=False):
         """Train with system dynamics"""
 
         # Set autoencoder network
@@ -173,7 +185,7 @@ class DeepSAD(object):
         self.trainer = DeepSADTrainerPhysical(n_outlier_classes, known_outlier_classes, coeff, optimizer_name, lr=lr, n_epochs=n_epochs, lr_milestones=lr_milestones,
                                     batch_size=batch_size, weight_decay=weight_decay, device=device,
                                     n_jobs_dataloader=n_jobs_dataloader, tau=tau)
-        self.net, best_auc = self.trainer.train(dataset, self.net)
+        self.net, best_auc = self.trainer.train(dataset, self.net, model_path, save)
 
         # Get train results
         self.results['train_time'] = self.trainer.train_time

@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 
-class ALFA(BaseADDataset):
+class Jet(BaseADDataset):
     def __init__(self, root: str, known_outlier_class: tuple = tuple(), subclasses: bool = True, training: bool = True, n_known_outlier_classes: int = 0, ratio_known_normal: float = 0.0,
                  ratio_known_outlier: float = 0.0, ratio_pollution: float = 0.0, random_state=None):
         super().__init__(root)

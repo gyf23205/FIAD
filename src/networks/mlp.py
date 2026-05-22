@@ -45,6 +45,18 @@ class MLP_Decoder(BaseNet):
         x = self.reconstruction(x)
         return self.output_activation(x)
 
+class DecoderSimple(BaseNet):
+
+    def __init__(self, x_dim, rep_dim, bias=False):
+        super().__init__()
+        self.reconstruction = nn.Linear(rep_dim, x_dim, bias=bias)
+        self.output_activation = nn.Sigmoid()
+
+    def forward(self, x):
+        x = x.view(int(x.size(0)), -1)
+        x = self.reconstruction(x)
+        return self.output_activation(x)
+
 class MLP_Physical(BaseNet):
 
     def __init__(self, x_dim, h_dims=[128, 64], rep_dim=32, out_dim=12, bias=False):
@@ -52,13 +64,19 @@ class MLP_Physical(BaseNet):
 
         self.rep_dim = rep_dim
         self.encoder = MLP(x_dim, h_dims, rep_dim, bias)
-        # self.predictor = MLP_Decoder(int(x_dim//seq_len), list(reversed(h_dims)), rep_dim, bias)
-        self.predictor = MLP_Decoder(out_dim, list(reversed(h_dims)), rep_dim, bias)
+        # self.predictor = MLP_Decoder(out_dim, list(reversed(h_dims)), rep_dim, bias)
+        self.predictor_simple = DecoderSimple(out_dim, rep_dim, bias)
+        self.project_head = nn.Sequential(nn.Linear(rep_dim, rep_dim), nn.ReLU(), nn.Linear(rep_dim, rep_dim))
 
     def forward(self, x):
         x = self.encoder(x)
-        x_next = self.predictor(x)  
+        # x_next = self.predictor(x)  
+        x_next = self.predictor_simple(x)
         return x, x_next
+    
+    def project(self, x):
+        x = self.project_head(x)
+        return x
         
         
 class MLP_State_Only(BaseNet):
