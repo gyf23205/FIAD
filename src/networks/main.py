@@ -90,7 +90,6 @@ def build_network(net_name, ae_net=None):
 
     # if net_name == 'transformer':
     #     net = Transformer(8, 2, 64, 512, 8, 6)
-
     if net_name == 'lstm':
         net = LSTM_Net(input_size=8, rep_dim=64, num_layers=2)
     
@@ -171,7 +170,6 @@ def build_autoencoder(net_name):
 
 def build_network_physical(net_name):
     implemented_networks = ('spoof_mlp', 'spoof_mlp_res', 'spoofing_mlp_state_only', 'mlp_alfa')
-    print(net_name)
     assert net_name in implemented_networks
 
     net_physical = None

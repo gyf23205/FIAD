@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import VarianceThreshold
 
-data_path = "data/ALFA/single_failure/"
+data_path = "data/ALFA/processed/"
 time_column = "%time"
 timestamp_column = "timestamp"
 
@@ -73,7 +73,7 @@ if __name__ == "__main__":
     for i, flight in enumerate(glob(os.path.join(data_path + "*"))):
         if any(x in flight for x in unused_flight_list):
             continue
-        # print(i, flight)
+
         flight_name = os.path.basename(flight)
 
         if flight_name not in time_dict:
@@ -107,22 +107,18 @@ if __name__ == "__main__":
 
             # Special handling for the failure_status
             if "failure_status" in topic_name:
-                # print(flight_name, topic_name)
-                if len(dfx[topic_name + ".data"].unique()) > 2:
-                    print(f"Multiple failure types found in {flight_name} for topic {topic_name}: {dfx[topic_name + '.data'].unique()}")
-                    continue
                 # Give different labels for different failure types
                 if "engine" in topic_name: # Keep the engine failure status as 1
                     pass
-                elif "aileron" in topic_name: # Aileron failure will be labeled 2, 3. 3 is missing from single failure dataset and are contained in hybrid failure dataset
-                    # print(flight_name, topic_name, dfx[topic_name + ".data"].unique())
-                    dfx[topic_name + ".data"] = dfx[topic_name + ".data"].replace([1, 2], [2, 3])
+                elif "aileron" in topic_name: # Aileron failure will be labeled 2, 3, 4
+                    dfx[topic_name + ".data"] = dfx[topic_name + ".data"].replace([1, 2, 3], [2, 3, 4])
 
-                elif "elevator" in topic_name: # Elevator failure will be labeled 4
-                    dfx[topic_name + ".data"] = dfx[topic_name + ".data"].replace([1], [4])
+                elif "elevator" in topic_name: # Elevator failure will be labeled 5, 6, 7
+                    dfx[topic_name + ".data"] = dfx[topic_name + ".data"].replace([1, 2, 3], [5, 6, 7])
 
-                elif "rudder" in topic_name: # Rudder failure will be labeled 5, 6. 1 is missing from single failure dataset and are contained in hybrid failure dataset
-                    dfx[topic_name + ".data"] = dfx[topic_name + ".data"].replace([2, 3], [5, 6])
+                elif "rudder" in topic_name: # Rudder failure will be labeled 8, 9
+                    dfx[topic_name + ".data"] = dfx[topic_name + ".data"].replace([1, 2], [8, 9])
+
 
             if df_merged is None:
                 df_merged = dfx
@@ -145,14 +141,21 @@ if __name__ == "__main__":
         df_merged = df_merged.drop(unused_columns, axis=1, errors="ignore")
         df_dict[flight_name] = df_merged
 
-        # print()
-
     X_all = []
     y_all = []
     next_all = []
 
     # Convert to numpy arrays
-    for flight_name, df in df_dict.items():      
+    for flight_name, df in df_dict.items():
+        count = 0
+        for col in df.columns:
+            if "failure" in col:
+                count += 1
+        # assert count <= 1, f"Count: {count}. More than one failure status columns found!"
+        if count > 1:
+            print(f"Count: {count}. More than one failure status columns found! Flight: {flight_name}")
+            continue
+        
         # Extract labels. All the labels for a flight are the same
         if "no_failure" in flight_name:
             y = 0
@@ -161,7 +164,7 @@ if __name__ == "__main__":
                 if "status" in col:
                     y = df[col].values[0]
                     break
-
+        
         # Extract features
         X = df.drop(columns=[col for col in df.columns if "status" in col]).values
         n_windows = (len(X) - window_size) // slide_size # + 1
@@ -190,6 +193,18 @@ if __name__ == "__main__":
     print(f"Num of normal samples: {np.sum(y_all==0)}, Num of anomaly samples: {np.sum(y_all!=0)}")
 
     # Save the final numpy arrays
-    np.save("data/ALFA/X_median-resampling_single_anomalies.npy", X_all)
-    np.save("data/ALFA/y_median-resampling_single_anomalies.npy", y_all)
-    np.save("data/ALFA/next_median-resampling_single_anomalies.npy", next_all)
+    np.save("data/ALFA/X_median-resampling_nine_anomalies.npy", X_all)
+    np.save("data/ALFA/y_median-resampling_nine_anomalies.npy", y_all)
+    np.save("data/ALFA/next_median-resampling_nine_anomalies.npy", next_all)
+
+        # if i==0:
+        #     print(f"columns: {df_merged.columns.tolist()}")
+
+        # print(f"Flight Name: {flight_name}, Columns: {df_merged.columns.tolist()}")
+        # print()
+
+    # # Save the processed DataFrame dictionary using dill
+    # df_file_name = "preprocessed_median-resampling_feature-selection.pkl"
+
+    # with open(os.path.join("data/ALFA", df_file_name), "wb") as f:
+    #     dill.dump(df_dict, f)

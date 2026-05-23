@@ -69,20 +69,11 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
     # print(seed)
     dataset = load_dataset(dataset_name, data_path, normal_class, known_outlier_classes, n_known_outlier_classes,
                            ratio_known_normal, ratio_known_outlier, ratio_pollution,
-                           random_state=np.random.RandomState(seed), subclasses=subclasses)
-    
-    # dataset_all = load_dataset(dataset_name, data_path, normal_class, known_outlier_classes, n_known_outlier_classes,
-    #                         ratio_known_normal, ratio_known_outlier, ratio_pollution,
-    #                         random_state=np.random.RandomState(seed),subclasses=subclasses, training=False)
-
-    # X_train, y_train, semi_y, X_test, y_test, X_val, y_val = dataset.data_direct()
-    # X_all = np.concatenate((X_train, X_val, X_test), axis=0)
-    # y_all = np.concatenate((y_train, y_val, y_test), axis=0)
+                           random_state=np.random.RandomState(seed))
 
     # Initialize DeepSAD model and set neural network phi
     deepSAD = DeepSAD(eta)
-    deepSAD.net_name = net_name
-    # deepSAD.set_network(net_name)
+    deepSAD.set_network(net_name)
 
     # If specified, load Deep SAD model (center c, network weights, and possibly autoencoder weights)
     if load_model:
@@ -134,18 +125,16 @@ def main(dataset_name, net_name, xp_path, data_path, load_config=None, load_mode
                            weight_decay=weight_decay,
                            device=device,
                            n_jobs_dataloader=n_jobs_dataloader,
-                           tau=tau,
-                           model_path=model_path,
-                           save=save)
+                           tau=tau)
 
     # Test model
     deepSAD.test_physical(dataset, device=device, n_jobs_dataloader=n_jobs_dataloader) # Need to comment this line if want to save the pred branch and also the end of train_physical
 
-    if save:
-        # Save results, model, and configuration
-        deepSAD.save_results(export_json=model_path + f'/results_physical.json')
-        deepSAD.save_model(export_model=model_path + f'/model_physical_best.tar', save_ae=pretrain) # Save the best model, but there can be other equally good models
-        cfg.save_config(export_json=model_path + f'/config_physical.json')
+    # Save results, model, and configuration
+    deepSAD.save_results(export_json=model_path + f'/results_physical.json')
+    deepSAD.save_model(export_model=model_path + f'/model_physical.tar', save_ae=pretrain)
+    cfg.save_config(export_json=model_path + f'/config_physical.json')
+
 
 if __name__ == '__main__':
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -162,53 +151,41 @@ if __name__ == '__main__':
     net_name = 'mlp_alfa'
     xp_path = './log/ALFA' # Log path
     data_path = './data'
-    ratio_known_outlier = 0.3 #0.3
-    ratio_known_normal = 0.2 # 0.2
-    ratio_pollution = 0.1 # 0.1
+    ratio_known_outlier = 0.3
+    ratio_known_normal = 0.2
+    ratio_pollution = 0.1
     rko = str(ratio_known_outlier).replace('.','')
     rp = str(ratio_pollution).replace('.','')
+    model_path = f'./saved_model/physical/model_{rko}_{rp}'
+    if not os.path.exists(model_path):
+        os.makedirs(model_path)
     lr = 0.0001
     eta = 6.9264986318494515
-    n_epochs = 1000
-    lr_milestone = [200, 400, 600, 800]
+    n_epochs = 50
+    lr_milestone = [50]
     batch_size = 128
     weight_decay = 0.5e-6
     pretrain = False
-    tau = 0.5
-    subclasses = True
-    save = True
+    tau = 0.1
     # ae_lr = 0.0001
     # ae_n_epochs = 150
-    # ae_batch_size = 256
+    # ae_batch_size = 128
     # ae_weight_decay = 0.5e-3
     normal_class = 0
-    known_outlier_classes = [1, 3, 4, 6] # One anomaly subtype is know for each kind of anomaly
+    known_outlier_classes = [1, 2, 5, 8] # One anomaly subtype is know for each kind of anomaly
     n_known_outlier_classes = len(known_outlier_classes)
-
     coeff = {
             'sad': 1.0,
-            'pred': 4.8,
-            'dir': 5.0,
-            'cluster': 1.7
+            'pred': 1.0,
+            'dir': 1.0,
+            'cluster': 0.0
         }
-    # coeff = {
-    #             'sad': 2.0,
-    #             'pred': 3.0,
-    #             'dir': 3.0,
-    #             'cluster': 4.0
-    #         }
-
-    model_path = f"./saved_model/physical/model_{rko}_{rp}_{coeff['sad']}_{coeff['pred']}_{coeff['dir']}_{coeff['cluster']}"
-    model_path = "." + model_path[1:].replace('.','d')
-    print(model_path)
-    if not os.path.exists(model_path):
-        os.makedirs(model_path)
-
+    
     # Log in wandb and setup hyperparameters
     wandb.login(key='1888b9830153065d084181ffc29812cd1011b84b')
     wandb.init(
         project='PIAD_Ext',
-        name='w_proj',
+        name='loss_all_alfa_scheduler',
         config={
             'dataset':'scaled',
            'ratio_known_outlier': ratio_known_outlier,
@@ -217,33 +194,17 @@ if __name__ == '__main__':
            'lr': lr,
            'batch size': batch_size,
            'weight decay': weight_decay,
-        #    'coeff': coeff,
+           'coeff': coeff,
            'physical': True,
            'pretrain': pretrain,
             'tau': tau
         }
     )
 
-    # coeff = {
-    #         'sad': wandb.config["coeff.sad"],
-    #         'pred': wandb.config["coeff.pred"],
-    #         'dir': wandb.config["coeff.dir"],
-    #         'cluster': wandb.config["coeff.cluster"]
-    #     }
-
-
-    # model_path = f"./saved_model/physical/model_{rko}_{rp}_{coeff['sad']}_{coeff['pred']}_{coeff['dir']}_{coeff['cluster']}"
-    # model_path = "." + model_path[1:].replace('.','d')
-    # print(model_path)
-    # if not os.path.exists(model_path):
-    #     os.makedirs(model_path)
+    # coeff = wandb.config.coeff
 
     # hypers = wandb.config
-    # setting.init([512, 512, 1024, 2.0]) # hd1, hd2, rep, T
-    # h1 = wandb.config.h1
-    # h2 = wandb.config.h2
-    # rep = wandb.config.rep
-    setting.init([256, 512, 64, 2.0]) # hd1, hd2, rep, T
+    setting.init([512, 512, 1024, 2.0]) # hd1, hd2, rep, T
     # Make the code deterministic
     seed = 4
 

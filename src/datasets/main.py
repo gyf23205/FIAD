@@ -13,7 +13,7 @@ from .ALFA import ALFA
 
 def load_dataset(dataset_name, data_path, normal_class, known_outlier_class, n_known_outlier_classes: int = 0,
                  ratio_known_normal: float = 0.0, ratio_known_outlier: float = 0.0, ratio_pollution: float = 0.0,
-                 random_state=None, subclasses: bool = True, training: bool = True):
+                 random_state=None):
     """Loads the dataset."""
 
     implemented_datasets = ('spoofing', 'spoofing_flat', 'spoofing_physical',
@@ -115,14 +115,11 @@ def load_dataset(dataset_name, data_path, normal_class, known_outlier_class, n_k
         
     if dataset_name == 'ALFA':
         dataset = ALFA(root=data_path,
-                        # dataset_name=dataset_name,
-                        known_outlier_class=known_outlier_class,
+                        dataset_name=dataset_name,
                         n_known_outlier_classes=n_known_outlier_classes,
                         ratio_known_normal=ratio_known_normal,
                         ratio_known_outlier=ratio_known_outlier,
                         ratio_pollution=ratio_pollution,
-                        subclasses=subclasses,
-                        training=training,
                         random_state=random_state)
 
     return dataset

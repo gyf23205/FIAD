@@ -14,17 +14,17 @@ from pathlib import Path
 
 
 class ALFA(BaseADDataset):
-    def __init__(self, root: str, known_outlier_class: tuple = tuple(), subclasses: bool = True, training: bool = True, n_known_outlier_classes: int = 0, ratio_known_normal: float = 0.0,
+    def __init__(self, root: str, subcases: bool = False, n_known_outlier_classes: int = 0, ratio_known_normal: float = 0.0,
                  ratio_known_outlier: float = 0.0, ratio_pollution: float = 0.0, random_state=None):
         super().__init__(root)
 
         # Define normal and outlier classes
 
-        if subclasses:
+        if subcases:
             # Contain all 9 fine-grained anomaly types
-            self.n_classes = 7 # 0: normal, 1: engine failure, 2, 3: aileron failure, 4: elevator failure, 5, 6: rudder failure 
+            self.n_classes = 9 # 0: normal, 1: engine failure, 2, 3, 4: aileron failure, 5, 6, 7: elevator failure, 8, 9: rudder failure 
             self.normal_classes = (0,)
-            self.outlier_classes = (1, 2, 3, 4, 5, 6)
+            self.outlier_classes = (1, 2, 3, 4, 5, 6, 7, 8, 9)
         else:
             # Contain 1 case for each anomaly type, other cases are used as unseen anomalies during testing
             self.n_classes = 5 # 0: normal, 1: engine failure, 2: aileron failure to right, 3: elevator failure, zero position, 4: rudder failure, zero position
@@ -33,7 +33,7 @@ class ALFA(BaseADDataset):
         if n_known_outlier_classes == 0:
             self.known_outlier_classes = ()
         else:
-            self.known_outlier_classes = known_outlier_class
+            self.known_outlier_classes = self.outlier_classes[:n_known_outlier_classes]
         self.unknown_outlier_classes = tuple(set(self.outlier_classes) - set(self.known_outlier_classes))
         # Get logger
         logger = logging.getLogger()
@@ -42,22 +42,11 @@ class ALFA(BaseADDataset):
         test_ratio = 0.2
         # test_ratio = 0.0001
         path = os.path.join(root,'ALFA')
-        signals = np.load(os.path.join(path,'X_median-resampling_single_anomalies.npy'))
-        signals_next = np.load(os.path.join(path, 'next_median-resampling_single_anomalies.npy'))
-        flags = np.load(os.path.join(path,'y_median-resampling_single_anomalies.npy'))
-        # Correct labels
-        if not subclasses:
-            flags[flags==2] = 2
-            flags[flags==3] = 2
-            flags[flags==4] = 3
-            flags[flags==5] = 4
-            flags[flags==6] = 4
-            
+        signals = np.load(os.path.join(path,'X_median-resampling_nine_anomalies.npy'))
+        signals_next = np.load(os.path.join(path, 'next_median-resampling_nine_anomalies.npy'))
+        flags = np.load(os.path.join(path,'y_median-resampling_nine_anomalies.npy'))
         idx_norm = flags==0
-        if training:
-            idx_out = np.isin(flags, self.known_outlier_classes)
-        else:
-            idx_out = np.isin(flags, self.outlier_classes)
+        idx_out = np.isin(flags, self.outlier_classes)
 
          # The model only learn the dynamics of the system during training
         X_train_norm, X_test_norm, y_train_norm, y_test_norm, next_train_norm, next_test_norm = train_test_split(signals[idx_norm], flags[idx_norm], signals_next[idx_norm],

@@ -63,14 +63,6 @@ def create_semisupervised_setting(labels, normal_classes, unknown_outlier_classe
     labels_unlabeled_normal = labels[idx_unlabeled_normal].tolist()
     labels_unlabeled_outlier = labels[idx_unlabeled_outlier].tolist()
     labels_labeled_outlier = labels[idx_labeled_outlier].tolist()
-    # Check that all known outlier classes appear at least once in labeled outliers
-    known_outlier_classes_in_labeled = np.unique(labels_labeled_outlier)
-    missing_classes = np.setdiff1d(known_outlier_classes, known_outlier_classes_in_labeled)
-    for mc in missing_classes:
-        # insert one sample of the missing class into the labeled set
-        idx_sample_mc = np.argwhere(labels==mc).flatten()[0]
-        labels_labeled_outlier.append(mc)
-        idx_labeled_outlier.append(idx_sample_mc)
 
     # Get semi-supervised setting labels
     semi_labels_labeled_normal = np.zeros(n_labeled_normal).astype(np.int32).tolist()
@@ -78,8 +70,7 @@ def create_semisupervised_setting(labels, normal_classes, unknown_outlier_classe
     semi_labels_unlabeled_outlier = (-np.ones(n_unlabeled_outlier)).astype(np.int32).tolist()
     semi_labels_labeled_outlier = labels_labeled_outlier
 
-
-    # Create final lists
+    # Create final lists, idx_unlabeled_outlier is buggy
     list_idx = idx_labeled_normal + idx_unlabeled_normal + idx_unlabeled_outlier + idx_labeled_outlier
     list_labels = labels_labeled_normal + labels_unlabeled_normal + labels_unlabeled_outlier + labels_labeled_outlier
     list_semi_labels = (semi_labels_labeled_normal + semi_labels_unlabeled_normal + semi_labels_unlabeled_outlier
