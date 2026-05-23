@@ -19,8 +19,7 @@ def build_network(net_name, ae_net=None):
                             'thyroid_mlp',
                             'arrhythmia_DGM_M2', 'cardio_DGM_M2', 'satellite_DGM_M2', 'satimage-2_DGM_M2',
                             'shuttle_DGM_M2', 'thyroid_DGM_M2',
-                            'transformer','lstm','spoof_mlp',
-                            'spoof_mlp_res', 'spoofing_mlp_state_only', 'mlp_alfa')
+                            'transformer','lstm','spoof_mlp', 'spoof_mlp_res', 'spoofing_mlp_state_only')
     assert net_name in implemented_networks
 
     net = None
@@ -101,9 +100,6 @@ def build_network(net_name, ae_net=None):
 
     if net_name == 'spoof_mlp_res':
         net = MLP(x_dim=1200, h_dims=[setting.hd1, setting.hd2], rep_dim=setting.rep, bias=False)
-
-    if net_name == 'mlp_alfa':
-        net = MLP(x_dim=25*35, h_dims=[setting.hd1, setting.hd2], rep_dim=setting.rep, bias=False)
     return net
 
 
@@ -169,7 +165,7 @@ def build_autoencoder(net_name):
     return ae_net
 
 def build_network_physical(net_name):
-    implemented_networks = ('spoof_mlp', 'spoof_mlp_res', 'spoofing_mlp_state_only', 'mlp_alfa')
+    implemented_networks = ('spoof_mlp', 'spoof_mlp_res', 'spoofing_mlp_state_only')
     assert net_name in implemented_networks
 
     net_physical = None
@@ -182,11 +178,7 @@ def build_network_physical(net_name):
     
     elif net_name == 'spoofing_mlp_state_only':
         net_physical = MLP_State_Only(x_dim=1200, h_dims=[setting.hd1, setting.hd2], rep_dim=setting.rep, bias=False)
-
-    elif net_name == 'mlp_alfa':
-        net_physical = MLP_Physical(x_dim=25*35, h_dims=[setting.hd1, setting.hd2], out_dim=35, rep_dim=setting.rep, bias=False)
-
     else:
         pass
-
+    
     return net_physical

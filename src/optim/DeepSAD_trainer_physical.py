@@ -3,10 +3,9 @@ from base.base_dataset import BaseADDataset
 from base.base_net import BaseNet
 from torch.utils.data.dataloader import DataLoader
 from torch.nn import MSELoss
-from sklearn.metrics import roc_auc_score, roc_curve, f1_score
-
-import setting
+from sklearn.metrics import roc_auc_score, roc_curve
 import wandb
+
 import logging
 import time
 import torch
@@ -15,209 +14,29 @@ import numpy as np
 import copy
 
 
-def compute_grad_norm(model):
-    total_norm = 0.0
-    for p in model.parameters():
-        param_norm = p.grad.data.norm(2)
-        total_norm += param_norm.item() ** 2
-    total_norm = total_norm ** (1. / 2)
-    return total_norm
-
-def pairwise_apply(A: torch.Tensor, f):
-    """
-    Returns F with shape (M, M) where F[i, j] = f(A[i], A[j]).
-    """
-    # vmap over the first argument (rows i) and second argument (rows j)
-    f_i = torch.vmap(f, in_dims=(0, None))         # map over i, keep v fixed
-    F   = torch.vmap(f_i, in_dims=(None, 0))(A, A) # then map over j
-    return F  # (M, M)
-
-def cos_sim(u, v):
-    # return torch.log(torch.nn.functional.sigmoid(torch.dot(u, v)/setting.rep))
-    den = (torch.norm(u) * torch.norm(v)).clamp_min(1e-8)
-    return torch.dot(u, v) / den
-
-# def pair_values_by_label(A: torch.Tensor, y: torch.Tensor, f, exclude_self=True):
-#     """
-#     Compute f(u, v) for all pairs, split into same-label and different-label.
-#     Returns:
-#       same_vals: 1-D tensor of values for pairs with same labels
-#       diff_vals: 1-D tensor of values for pairs with different labels
-#     """
-#     F = pairwise_apply(A, f)           # (M, M)
-#     M = A.shape[0]
-
-#     same_mask = (y.unsqueeze(0) == y.unsqueeze(1))  # (M, M)
-#     # print(same_mask)
-#     if exclude_self:
-#         # keep only i != j (unordered pairs use upper triangle)
-#         tri = torch.ones(M, M, dtype=torch.bool, device=A.device).triu(diagonal=1)
-#         same_vals = F[same_mask & tri]
-#         diff_vals = F[(~same_mask) & tri]
-#     else:
-#         same_vals = F[same_mask]
-#         diff_vals = F[~same_mask]
-
-#     return same_vals, diff_vals
-
-def l_contrastive(A, y):
-    """
-    A:  (k, k) matrix with A[i, j] = (f_i · f_j / tau)
-    y:  (k,) integer labels
-    returns: scalar loss
-    """
-    k = A.size(0)
-    device = A.device
-    y = y.view(-1)
-
-    # Masks
-    same = (y.unsqueeze(0) == y.unsqueeze(1))               # same class (incl. self)
-    eye  = torch.eye(k, dtype=torch.bool, device=device)
-    pos_mask = same & ~eye                                  # positives P(i)
-    neg_mask = ~same                                        # negatives A(i)
-
-    # logsumexp over negatives (masked)
-    neg_logits = A.masked_fill(~neg_mask, float('-inf'))
-    lse_neg = torch.logsumexp(neg_logits, dim=1)            # (k,)
-
-    # average over positives
-    pos_counts = pos_mask.sum(dim=1)
-    valid_pos = pos_counts > 0                              # anchors with positives
-    sum_pos = (A * pos_mask.float()).sum(dim=1)
-    mean_pos = torch.zeros_like(sum_pos)
-    mean_pos[valid_pos] = sum_pos[valid_pos] / pos_counts[valid_pos]
-
-    # check which anchors have negatives
-    valid_neg = neg_mask.sum(dim=1) > 0                     # anchors with negatives
-
-    # final valid anchors
-    valid = valid_pos & valid_neg
-    if not valid.any():
-        return torch.tensor(0.0, device=device, requires_grad=True)
-
-    # loss per anchor: L(i) = logsumexp_neg(i) - mean_pos(i)
-    loss_i = lse_neg - mean_pos
-    loss = loss_i[valid].mean()
-    return loss
-
-def get_all_centroids(A: torch.Tensor, y: torch.Tensor):
-    """
-    Compute centroids for all classes in y.
-    Returns:
-      centroids: dict mapping label -> centroid tensor
-    """
-    # Differentiable computation of centroids using scatter_add
-    labels = torch.unique(y)
-    centroids = {}
-    for label in labels:
-        mask = (y == label)
-        count = mask.sum()
-        # Avoid division by zero
-        if count > 0:
-            centroid = (A * mask.unsqueeze(1)).sum(dim=0) / count
-            centroids[label.item()] = centroid
-        else:
-            centroids[label.item()] = torch.zeros_like(A[0])
-    return centroids
-
 class DeepSADTrainerPhysical(BaseTrainer):
 
-    def __init__(self, n_known_outlier_classes: int, known_outlier_classes, coeff: dict, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 150,
+    def __init__(self, c, eta: float, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 150,
                  lr_milestones: tuple = (), batch_size: int = 128, weight_decay: float = 1e-6, device: str = 'cuda',
-                 n_jobs_dataloader: int = 0, tau=0.1):
+                 n_jobs_dataloader: int = 0):
         super().__init__(optimizer_name, lr, n_epochs, lr_milestones, batch_size, weight_decay, device,
                          n_jobs_dataloader)
 
         # Deep SAD parameters
-        self.n_known_outlier_classes = n_known_outlier_classes
-        self.known_outlier_classes = known_outlier_classes
-        self.centroids = {
-            'c_normal': torch.zeros((setting.rep,), device=self.device)
-        }
-        for i in range(n_known_outlier_classes):
-            self.centroids['c_outlier_{}'.format(i+1)] = torch.zeros((setting.rep,), device=self.device)
+        self.c = torch.tensor(c, device=self.device) if c is not None else None
         self.roc_curve = None
-        self.coeff = coeff
-        self.n_aug = 2
-        self.tau = tau
+        self.eta = eta
 
         # Optimization parameters
         self.eps = 1e-6
-        self.MSE_loss = MSELoss()
 
         # Results
         self.train_time = None
         self.test_auc = None
         self.test_time = None
         self.test_scores = None
-        self.test_f1 = None
 
-    def loss_all(self, outputs, semi_targets, signal_pred, signal_next):
-        loss = 0.0
-        ########## Original Deep SAD loss ##########
-        dist = torch.sum((outputs - self.centroids['c_normal']) ** 2, dim=1)
-        loss_sad1 = torch.where(semi_targets <= 0, dist, ((dist + self.eps).float()))
-        loss_sad2 = torch.where(semi_targets > 0 , dist, (torch.reciprocal(dist + self.eps).float()))
-        loss_sad = torch.mean(loss_sad1) + torch.mean(loss_sad2)
-        ######### Physics-informed loss ##########
-        loss_pred = self.MSE_loss(signal_pred, signal_next)
-
-        ########## Directional loss ##############
-        idx_labeled = (semi_targets>=0)
-
-        if torch.sum(idx_labeled)<=1:
-            loss_dir = torch.tensor(0.0).to(self.device)
-        else:
-            A = pairwise_apply(outputs[idx_labeled]-self.centroids['c_normal'], cos_sim)
-            y_tensor = semi_targets[idx_labeled]
-            loss_dir = l_contrastive(A/self.tau, y_tensor)
-
-            # # loss_dir can be computed between centroids or between all pairs of labeled samples
-            # centroid_wise = False
-            # if centroid_wise:
-            #     # Get centroids of labeled samples
-            #     A = get_all_centroids(outputs[idx_labeled], semi_targets[idx_labeled])
-            #     A_tensor = torch.stack([A[k] - self.centroids['c_normal'] for k in sorted(A.keys())])
-            #     y_tensor = torch.tensor(sorted(A.keys()), device=self.device)
-            #     same_vals, diff_vals = pair_values_by_label(A_tensor, y_tensor, l_dir, exclude_self=True)
-            # else:
-            #     same_vals, diff_vals = pair_values_by_label(outputs[idx_labeled]-self.centroids['c_normal'], semi_targets[idx_labeled], l_dir, exclude_self=True)
-            #     same_vals /= self.tau
-            #     diff_vals /= self.tau
-            # loss_dir_same = torch.mean(same_vals) if len(same_vals)>0 else torch.tensor(0.0).to(self.device)
-            # loss_dir_diff = torch.mean(diff_vals) if len(diff_vals)>0 else torch.tensor(0.0).to(self.device)
-            # loss_dir = loss_dir_same - loss_dir_diff
-
-
-        ############ Clustering loss #############
-        # # Labeled normals loss
-        # dist_normal = torch.sum((outputs[semi_targets == 0] - self.centroids['c_normal']) ** 2, dim=1)
-        # loss_normal = torch.mean(dist_normal) if len(dist_normal)>0 else torch.tensor(0.0).to(self.device)
-
-        # # Labeled outliers loss
-        # loss_outlier = 0.0
-        # for i in range(1, self.n_known_outlier_classes+1):
-        #     dist_outlier = torch.sum((outputs[semi_targets == i] - self.centroids['c_outlier_{}'.format(i)]) ** 2, dim=1)
-        #     loss_outlier += torch.mean(dist_outlier) if len(dist_outlier)>0 else torch.tensor(0.0).to(self.device)
-
-        # # Compute the distance between all the unlabeled samples and the closest centroid
-        # dist_unlabeled = torch.zeros((len(outputs[semi_targets == -1]), self.n_known_outlier_classes+1)).to(self.device)
-        # for i in range(self.n_known_outlier_classes+1):
-        #     if i == 0:
-        #         dist_unlabeled[:, i] = torch.sum((outputs[semi_targets == -1] - self.centroids['c_normal']) ** 2, dim=1)
-        #     else:
-        #         dist_unlabeled[:, i] = torch.sum((outputs[semi_targets == -1] - self.centroids['c_outlier_{}'.format(i)]) ** 2, dim=1)
-        # min_dist_unlabeled, _ = torch.min(dist_unlabeled, dim=1)
-        # loss_unlabeled = torch.mean(min_dist_unlabeled) if len(min_dist_unlabeled)>0 else torch.tensor(0.0).to(self.device)
-        # loss_cluster = loss_normal + loss_outlier + loss_unlabeled
-
-        loss += self.coeff['sad'] * loss_sad \
-                + self.coeff['pred'] * loss_pred \
-                + self.coeff['dir'] * loss_dir
-                # + self.coeff['cluster'] * loss_cluster
-        return loss, loss_sad, loss_pred, loss_dir #, loss_cluster
-
-    def train(self, dataset: BaseADDataset, net: BaseNet):
+    def train(self, dataset: BaseADDataset, net: BaseNet, weight_pred):
         logger = logging.getLogger()
 
         # Get train data loader
@@ -235,58 +54,46 @@ class DeepSADTrainerPhysical(BaseTrainer):
         scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=self.lr_milestones, gamma=0.1)
 
         # Initialize hypersphere center c (if c not loaded)
-
-        logger.info('Initializing center c...')
-        self.update_center(train_loader, net)
-        logger.info('Center c initialized.')
+        if self.c is None:
+            logger.info('Initializing center c...')
+            self.c = self.init_center_c(train_loader, net)
+            logger.info('Center c initialized.')
         # Training
         logger.info('Starting training physically...')
         start_time = time.time()
-        # best_val_loss = np.inf
         best_auc = -np.inf
         net_store = None
-        centroids_store = None
         for epoch in range(self.n_epochs):
             net.train()
-            scheduler.step()
-            if epoch in self.lr_milestones:
-                logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
+            # scheduler.step()
+            # if epoch in self.lr_milestones:
+            #     logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
 
             epoch_loss = 0.0
             epoch_loss_pred = 0.0
-            epoch_loss_sad = 0.0
-            epoch_loss_dir = 0.0
-            # epoch_loss_cluster = 0.0
             n_batches = 0
             epoch_start_time = time.time()
             for data in train_loader:
                 inputs, _, semi_targets, _, signal_next = data
                 inputs, semi_targets, signal_next = inputs.to(self.device), semi_targets.to(self.device), signal_next.to(self.device)
 
-                # Online data augmentation
-                inputs, semi_targets, signal_next = self.data_augmentation(inputs, semi_targets, signal_next)
+                # Zero the network parameter gradients
+                optimizer.zero_grad()
 
                 # Update network parameters via backpropagation: forward + backward + optimize
                 outputs, signal_pred = net(inputs)
-
-                loss, loss_sad, loss_pred, loss_dir = self.loss_all(outputs, semi_targets, signal_pred, signal_next)
-                
-                optimizer.zero_grad()
+                dist = torch.sum((outputs - self.c) ** 2, dim=1)
+                losses = torch.where(semi_targets == 0, dist, self.eta * ((dist + self.eps) ** semi_targets.float()))
+                loss = torch.mean(losses)
+                MSE_loss = MSELoss()
+                loss_pred = MSE_loss(signal_pred, signal_next)
+                loss += weight_pred * loss_pred
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(net.parameters(), max_norm=5.0)
-                # print(compute_grad_norm(net))
                 optimizer.step()
 
                 epoch_loss += loss.item()
                 epoch_loss_pred += loss_pred.item()
-                epoch_loss_sad += loss_sad.item()
-                epoch_loss_dir += loss_dir.item()
-                # epoch_loss_cluster += loss_cluster.item()
                 n_batches += 1
-
-            # Update centroids each epoch
-            with torch.no_grad():
-                self.update_center(train_loader, net)
 
             scheduler.step()
             if epoch in self.lr_milestones:
@@ -297,11 +104,10 @@ class DeepSADTrainerPhysical(BaseTrainer):
             logger.info(f'| Epoch: {epoch + 1:03}/{self.n_epochs:03} | Train Time: {epoch_train_time:.3f}s '
                         f'| Train Loss: {epoch_loss / n_batches:.6f} |')
             wandb.log({'Train loss': epoch_loss / n_batches, 'Train time': epoch_train_time, 
-                       'loss_pred':self.coeff['pred']*epoch_loss_pred/n_batches, 'loss_sad':self.coeff['sad']*epoch_loss_sad/n_batches,
-                       'loss_dir':self.coeff['dir']*epoch_loss_dir/n_batches})
+                       'loss_pred':epoch_loss_pred/n_batches, 'loss_dist':(epoch_loss-epoch_loss_pred)/n_batches})
 
             # Validation
-            if epoch%20 == 0 and epoch > 0:
+            if epoch%20==0 and epoch>0:
                 val_auc, roc_curve = self.val(val_loader, net)
                 wandb.log({'Validation AUC': val_auc})
                 if val_auc>best_auc:
@@ -309,14 +115,82 @@ class DeepSADTrainerPhysical(BaseTrainer):
                     self.roc_curve = roc_curve
                     best_auc = val_auc
                     net_store = copy.deepcopy(net)
-                    centroids_store = copy.deepcopy(self.centroids)
-              
-        self.centroids = centroids_store
         self.train_time = time.time() - start_time
         logger.info('Training Time: {:.3f}s'.format(self.train_time))
         logger.info('Finished training.')
 
         return net_store, best_auc
+    
+    def initilize_physical(self, dataset: BaseADDataset, net: BaseNet, weight_pred):
+        logger = logging.getLogger()
+
+        # Get train data loader
+        train_loader, val_loader, _ = dataset.loaders(batch_size=self.batch_size, num_workers=self.n_jobs_dataloader)
+
+        logger.info(f'Training set size: {len(train_loader)}')
+
+        # Set device for network
+        net = net.to(self.device)
+
+        # Set optimizer (Adam optimizer for now)
+        optimizer = optim.Adam(net.parameters(), lr=self.lr, weight_decay=self.weight_decay)
+
+        # Set learning rate scheduler
+        scheduler = optim.lr_scheduler.MultiStepLR(optimizer, milestones=self.lr_milestones, gamma=0.1)
+
+        # Initialize hypersphere center c (if c not loaded)
+        if self.c is None:
+            logger.info('Initializing center c...')
+            self.c = self.init_center_c(train_loader, net)
+            logger.info('Center c initialized.')
+        # Training
+        start_time = time.time()
+
+        for epoch in range(self.n_epochs):
+            net.train()
+            # scheduler.step()
+            # if epoch in self.lr_milestones:
+            #     logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
+
+            epoch_loss = 0.0
+            epoch_loss_pred = 0.0
+            n_batches = 0
+            epoch_start_time = time.time()
+            for data in train_loader:
+                inputs, _, semi_targets, _, signal_next = data
+                inputs, semi_targets, signal_next = inputs.to(self.device), semi_targets.to(self.device), signal_next.to(self.device)
+
+                # Zero the network parameter gradients
+                optimizer.zero_grad()
+
+                # Update network parameters via backpropagation: forward + backward + optimize
+                outputs, signal_pred = net(inputs)
+                dist = torch.sum((outputs - self.c) ** 2, dim=1)
+                losses = torch.where(semi_targets == 0, dist, self.eta * ((dist + self.eps) ** semi_targets.float()))
+                loss = torch.mean(losses)
+                MSE_loss = MSELoss()
+                loss_pred = MSE_loss(signal_pred, signal_next)
+                loss += weight_pred * loss_pred
+                loss.backward()
+                optimizer.step()
+
+                epoch_loss += loss.item()
+                epoch_loss_pred += loss_pred.item()
+                n_batches += 1
+
+            scheduler.step()
+            if epoch in self.lr_milestones:
+                logger.info('  LR scheduler: new learning rate is %g' % float(scheduler.get_lr()[0]))
+                
+            # log epoch statistics
+            epoch_train_time = time.time() - epoch_start_time
+            logger.info(f'| Epoch: {epoch + 1:03}/{self.n_epochs:03} | Train Time: {epoch_train_time:.3f}s '
+                        f'| Train Loss: {epoch_loss / n_batches:.6f} |')
+
+        self.train_time = time.time() - start_time
+        logger.info('Training Time: {:.3f}s'.format(self.train_time))
+        logger.info('Finished training.')
+        return net
 
     def test(self, dataset: BaseADDataset, net: BaseNet):
         logger = logging.getLogger()
@@ -336,25 +210,23 @@ class DeepSADTrainerPhysical(BaseTrainer):
         net.eval()
         with torch.no_grad():
             for data in test_loader:
-                inputs, labels, semi_targets, idx, signal_next = data
+                inputs, labels, semi_targets, idx = data
 
                 inputs = inputs.to(self.device)
                 labels = labels.to(self.device)
                 semi_targets = semi_targets.to(self.device)
                 idx = idx.to(self.device)
-                signal_next = signal_next.to(self.device)
 
-                outputs, signal_pred = net(inputs)
-                dist_norm = torch.sum((outputs - self.centroids['c_normal']) ** 2, dim=1)
-                loss, loss_sad, loss_pred, loss_dir = self.loss_all(outputs, semi_targets, signal_pred, signal_next)
+                outputs = net(inputs)
+                dist = torch.sum((outputs - self.c) ** 2, dim=1)
+                losses = torch.where(semi_targets == 0, dist, self.eta * ((dist + self.eps) ** semi_targets.float()))
+                loss = torch.mean(losses)
+                scores = dist
 
-                scores = dist_norm
-
-                # Save tuples of (idx, label, score, outputs) in a list
+                # Save triples of (idx, label, score) in a list
                 idx_label_score += list(zip(idx.cpu().data.numpy().tolist(),
                                             labels.cpu().data.numpy().tolist(),
-                                            scores.cpu().data.numpy().tolist(),
-                                            outputs.cpu().data.numpy().tolist()))
+                                            scores.cpu().data.numpy().tolist()))
 
                 epoch_loss += loss.item()
                 n_batches += 1
@@ -363,37 +235,15 @@ class DeepSADTrainerPhysical(BaseTrainer):
         self.test_scores = idx_label_score
 
         # Compute AUC
-        _, labels, scores, outputs = zip(*idx_label_score)
+        _, labels, scores = zip(*idx_label_score)
         labels = np.array(labels)
-        labels[labels>0] = 1 # Treat all outlier classes as one class, may be changed to compute per-class AUC
         scores = np.array(scores)
         self.test_auc = roc_auc_score(labels, scores)
-
-        # Compute F1 score based on the best threshold from ROC curve and dist to each centroid
-        fpr, tpr, thresholds = self.roc_curve
-        youden_index = tpr - fpr
-        best_threshold = thresholds[np.argmax(youden_index)]
-        # If score < best_threshold, predict as normal (0); else predict base on closest centroid
-        samples_normal = scores <= best_threshold
-        samples_anomaly = scores > best_threshold
-        y_pred = np.zeros_like(labels)
-        y_pred[samples_normal] = 0
-        centroids_tensor = torch.stack(list(self.centroids.values()))[1:].to(self.device)
-        dist_anomaly = torch.norm(torch.tensor(outputs, device=self.device).unsqueeze(1) - centroids_tensor.unsqueeze(0), dim=2)
-        y_pred[samples_anomaly] = torch.argmin(dist_anomaly, dim=1).cpu().numpy()[samples_anomaly] + 1
-        # Compute F1 score
-        self.test_f1 = f1_score(labels, y_pred, average='macro')
-        # Compute acc and recall
-        acc = np.mean(labels == y_pred)
-        recall = np.sum((labels>=1) & (y_pred==labels)) / np.sum(labels>=1)
 
         # Log results
         logger.info('Test Loss: {:.6f}'.format(epoch_loss / n_batches))
         logger.info('Test AUC: {:.2f}%'.format(100. * self.test_auc))
         logger.info('Test Time: {:.3f}s'.format(self.test_time))
-        logger.info('Test F1 score: {:.4f}'.format(self.test_f1))
-        logger.info('Test Accuracy: {:.4f}'.format(acc))
-        logger.info('Test Recall: {:.4f}'.format(recall))
         logger.info('Finished testing.')
 
     def val(self, val_loader, net: BaseNet):
@@ -407,18 +257,17 @@ class DeepSADTrainerPhysical(BaseTrainer):
         net.eval()
         with torch.no_grad():
             for data in val_loader:
-                inputs, labels, semi_targets, idx, signal_next = data
+                inputs, labels, semi_targets, idx = data
 
                 inputs = inputs.to(self.device)
                 labels = labels.to(self.device)
                 semi_targets = semi_targets.to(self.device)
                 idx = idx.to(self.device)
-                signal_next = signal_next.to(self.device)
 
-                outputs, signal_pred = net(inputs)
-                dist = torch.sum((outputs - self.centroids['c_normal']) ** 2, dim=1)
-                loss, loss_sad, loss_pred, loss_dir = self.loss_all(outputs, semi_targets, signal_pred, signal_next)
-
+                outputs, _ = net(inputs)
+                dist = torch.sum((outputs - self.c) ** 2, dim=1)
+                losses = torch.where(semi_targets == 0, dist, self.eta * ((dist + self.eps) ** semi_targets.float()))
+                loss = torch.mean(losses)
                 scores = dist
 
                 # Save triples of (idx, label, score) in a list
@@ -432,7 +281,6 @@ class DeepSADTrainerPhysical(BaseTrainer):
         # Compute AUC
         _, labels, scores = zip(*idx_label_score)
         labels = np.array(labels)
-        labels[labels>0] = 1 # Treat all outlier classes as one class, may be changed to compute per-class AUC
         scores = np.array(scores)
         val_auc = roc_auc_score(labels, scores)
         fpr, tpr, thresholds = roc_curve(labels, scores, pos_label=1)
@@ -445,71 +293,39 @@ class DeepSADTrainerPhysical(BaseTrainer):
         logger.info('Finished validation.')
         return val_auc, (fpr, tpr, thresholds)
 
-        # return epoch_loss / n_batches
-
-    def update_center(self, train_loader: DataLoader, net: BaseNet, eps=0.1):
+    def init_center_c(self, train_loader: DataLoader, net: BaseNet, eps=0.1):
         """Initialize hypersphere center c as the mean from an initial forward pass on the data."""
-        n_samples = torch.zeros(self.n_known_outlier_classes+1, device=self.device)
+        n_samples = 0
+        # c = torch.zeros(net.rep_dim*net.num_layers, device=self.device)
+        c = torch.zeros(net.rep_dim, device=self.device)
+
         net.eval()
         with torch.no_grad():
             for data in train_loader:
                 # get the inputs of the batch
-                inputs, target, semi_target, index, data_next = data
-                for i in range(self.n_known_outlier_classes + 1):
-                    if semi_target[semi_target == i].shape[0] > 0:
-                        inputs_temp = inputs[semi_target == i]
-                        outputs_temp, _ = net(inputs_temp.to(self.device))
-                        n_samples[i] += outputs_temp.shape[0]
-                        if i == 0:
-                            self.centroids['c_normal'] += torch.sum(outputs_temp, dim=0)
-                        else:
-                            self.centroids['c_outlier_{}'.format(i)] += torch.sum(outputs_temp, dim=0)
+                inputs, _, _, _, _ = data
+                inputs = inputs.to(self.device)
+                outputs, _ = net(inputs)
+                # print('in shape:', inputs.shape)
+                # print(type(net))
+                # print('output shape:', torch.sum(outputs, dim=0).shape)
+                # print('center shape', c.shape)
+                n_samples += outputs.shape[0]
+                c += torch.sum(outputs, dim=0)
 
-            # If there are no samples for a class, set the center to unlabeled samples
-            if any(n_samples == 0):
-                count = 0
-                c = torch.zeros((setting.rep,), device=self.device)
-                for data in train_loader:
-                    inputs, target, semi_target, index, data_next = data
-                    inputs_unlabeled = inputs[semi_target == -1]
-                    outputs_unlabeled, _ = net(inputs_unlabeled.to(self.device))
-                    count += outputs_unlabeled.shape[0]
-                    c += torch.sum(outputs_unlabeled, dim=0)
-                c /= count
+        c /= n_samples
 
-        for i in range(self.n_known_outlier_classes + 1):
-            if n_samples[i] == 0:
-                if i == 0:
-                    self.centroids['c_normal'] = c
-                else:
-                    self.centroids['c_outlier_{}'.format(i)] = c
-            else:
-                if i == 0:
-                    self.centroids['c_normal'] /= n_samples[i]
-                    self.centroids['c_normal'][(abs(self.centroids['c_normal']) < eps) & (self.centroids['c_normal'] < 0)] = -eps
-                    self.centroids['c_normal'][(abs(self.centroids['c_normal']) < eps) & (self.centroids['c_normal'] > 0)] = eps
-                else:
-                    self.centroids['c_outlier_{}'.format(i)] /= n_samples[i]
-                    self.centroids['c_outlier_{}'.format(i)][(abs(self.centroids['c_outlier_{}'.format(i)]) < eps) & (self.centroids['c_outlier_{}'.format(i)] < 0)] = -eps
-                    self.centroids['c_outlier_{}'.format(i)][(abs(self.centroids['c_outlier_{}'.format(i)]) < eps) & (self.centroids['c_outlier_{}'.format(i)] > 0)] = eps
-    
-    def data_augmentation(self, inputs, semi_targets, signal_next):
-        labeled_idx = semi_targets >= 0
-        inputs_aug_list = [inputs]
-        semi_targets_aug_list = [semi_targets]
-        signal_next_aug_list = [signal_next]
-        for i in range(self.n_aug):
-            # Add Gaussian noise to labeled samples
-            noise = torch.randn_like(inputs[labeled_idx]) * 0.05
-            inputs_aug = inputs[labeled_idx].clone()
-            inputs_aug += noise
-            semi_targets_aug = semi_targets[labeled_idx].clone()
-            signal_next_aug = signal_next[labeled_idx].clone() + torch.randn_like(signal_next[labeled_idx]) * 0.05
-            inputs_aug_list.append(inputs_aug)
-            semi_targets_aug_list.append(semi_targets_aug)
-            signal_next_aug_list.append(signal_next_aug)
+        # If c_i is too close to 0, set to +-eps. Reason: a zero unit can be trivially matched with zero weights.
+        c[(abs(c) < eps) & (c < 0)] = -eps
+        c[(abs(c) < eps) & (c > 0)] = eps
+
+        return c
+
+    # def choose_best_r(self, fpr, tpr, thresholds):
+    #     ratio = []
+    #     eps = 1e-7  # In case divide by 0
+    #     for i in range(len(tpr)-1):
+    #         ratio.append((tpr[i+1]-tpr[i])/(fpr[i+1]-fpr[i]+eps))
         
-        inputs_aug = torch.cat(inputs_aug_list, dim=0)
-        semi_targets_aug = torch.cat(semi_targets_aug_list, dim=0)
-        signal_next_aug = torch.cat(signal_next_aug_list, dim=0)
-        return inputs_aug, semi_targets_aug, signal_next_aug
+    #     return thresholds[np.argmax(ratio)]
+    #     # return thresholds[-1]

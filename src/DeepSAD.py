@@ -101,6 +101,9 @@ class DeepSAD(object):
     def test_physical(self, dataset: BaseADDataset, device: str = 'cuda', n_jobs_dataloader: int = 0):
         """Tests the Deep SAD model on the test data."""
 
+        if self.trainer is None:
+            self.trainer = DeepSADTrainerPhysical(self.c, self.eta, device=device, n_jobs_dataloader=n_jobs_dataloader)
+
         self.trainer.test(dataset, self.net)
 
         # Get results
@@ -159,9 +162,9 @@ class DeepSAD(object):
         self.create_from_physically_informed()
 
 
-    def train_physical(self, dataset: BaseADDataset, n_outlier_classes: int, known_outlier_classes, coeff: dict, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 100,
+    def train_physical(self, dataset: BaseADDataset, optimizer_name: str = 'adam', lr: float = 0.001, n_epochs: int = 100,
                 lr_milestones: tuple = (), batch_size: int = 128, weight_decay: float = 1e-6, device: str = 'cuda',
-                n_jobs_dataloader: int = 0, tau=0.1):
+                n_jobs_dataloader: int = 0, weight_pred=5):
         """Train with system dynamics"""
 
         # Set autoencoder network
@@ -170,17 +173,17 @@ class DeepSAD(object):
 
         # Train
         self.optimizer_name = optimizer_name
-        self.trainer = DeepSADTrainerPhysical(n_outlier_classes, known_outlier_classes, coeff, optimizer_name, lr=lr, n_epochs=n_epochs, lr_milestones=lr_milestones,
+        self.trainer = DeepSADTrainerPhysical(self.c, self.eta, optimizer_name, lr=lr, n_epochs=n_epochs, lr_milestones=lr_milestones,
                                     batch_size=batch_size, weight_decay=weight_decay, device=device,
-                                    n_jobs_dataloader=n_jobs_dataloader, tau=tau)
-        self.net, best_auc = self.trainer.train(dataset, self.net)
+                                    n_jobs_dataloader=n_jobs_dataloader)
+        self.net, best_auc = self.trainer.train(dataset, self.net, weight_pred)
 
         # Get train results
         self.results['train_time'] = self.trainer.train_time
-        self.centroids = self.trainer.centroids
+        self.c = self.trainer.c.cpu().data.numpy().tolist()  # get as list
         self.roc_curve = self.trainer.roc_curve
 
-        self.net_wo_pred = self.create_from_physically_informed()
+        self.create_from_physically_informed() # Comment this line if also want to save the state predictor.
         wandb.log({'best_auc': best_auc})
 
     def init_network_weights_from_pretraining(self):
@@ -209,21 +212,19 @@ class DeepSAD(object):
         net_dict.update(dict_temp)
         # Load the new state_dict
         net_temp.load_state_dict(net_dict)
-        # self.net = copy.deepcopy(net_temp)
+        self.net = copy.deepcopy(net_temp)
         print('created')
-        return net_temp
 
     def save_model(self, export_model, save_ae=True):
         """Save Deep SAD model to export_model."""
 
         net_dict = self.net.state_dict()
-        net_wo_pred_dict = self.net_wo_pred.state_dict() if hasattr(self, 'net_wo_pred') else None
-        # ae_net_dict = self.ae_net.state_dict() if save_ae else None
+        ae_net_dict = self.ae_net.state_dict() if save_ae else None
 
-        torch.save({'centroids': self.centroids,
+        torch.save({'c': self.c,
                     'roc': self.roc_curve,
                     'net_dict': net_dict,
-                    'net_wo_pred_dict': net_wo_pred_dict}, export_model)
+                    'ae_net_dict': ae_net_dict}, export_model)
 
     def load_model(self, model_path, load_ae=False, map_location='cpu'):
         """Load Deep SAD model from model_path."""
